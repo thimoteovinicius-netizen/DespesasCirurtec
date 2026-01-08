@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Despesas Cirurtec</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+<style>
+body{font-family:Arial;margin:0;background:#f1f5f9}
+header{background:#0f172a;color:#fff;padding:15px;text-align:center}
+main{padding:15px}
+input,button{width:100%;padding:10px;margin:5px 0}
+button{background:#2563eb;color:#fff;border:none;border-radius:5px}
+.card{background:#fff;padding:15px;border-radius:8px;margin-bottom:10px}
+.total{font-weight:bold;margin-top:10px}
+</style>
+</head>
+
+<body>
+<header>
+<img src="logo.png" style="max-height:50px"><br>
+Despesas Cirurtec
+</header>
+
+<main>
+
+<div class="card">
+<h3>Nova Viagem</h3>
+<input id="viagem" placeholder="Descrição da viagem">
+<input id="adiantamento" type="number" placeholder="Valor do adiantamento">
+<button onclick="novaViagem()">Salvar</button>
+</div>
+
+<div id="viagens"></div>
+
+</main>
+
+<script>
+let dados = JSON.parse(localStorage.getItem('dados') || '[]');
+
+function novaViagem(){
+ dados.push({
+   desc:viagem.value,
+   adiantamento:Number(adiantamento.value),
+   despesas:[]
+ });
+ localStorage.setItem('dados',JSON.stringify(dados));
+ render();
+}
+
+function render(){
+ viagens.innerHTML='';
+ dados.forEach((v,i)=>{
+   let total=v.despesas.reduce((s,d)=>s+d.valor,0);
+   viagens.innerHTML+=`
+   <div class='card'>
+   <b>${v.desc}</b><br>
+   Adiantamento: R$ ${v.adiantamento.toFixed(2)}<br>
+   Total gasto: R$ ${total.toFixed(2)}<br>
+   Saldo: R$ ${(v.adiantamento-total).toFixed(2)}<br><br>
+   <input placeholder='Despesa' id='d${i}'>
+   <input type='number' placeholder='Valor' id='v${i}'>
+   <button onclick='addDespesa(${i})'>Adicionar despesa</button>
+   </div>`;
+ });
+}
+
+function addDespesa(i){
+ let d=document.getElementById('d'+i).value;
+ let v=Number(document.getElementById('v'+i).value);
+ dados[i].despesas.push({desc:d,valor:v});
+ localStorage.setItem('dados',JSON.stringify(dados));
+ render();
+}
+
+render();
+</script>
+</body>
+</html>
