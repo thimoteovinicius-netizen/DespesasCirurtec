@@ -5,20 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Despesas Cirurtec</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1jspdf.umd.min.js"></script>
 
 <style>
 body{font-family:Arial, sans-serif;background:#f4f4f4;padding:15px;}
 h1{text-align:center;}
 .card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px;}
-input,select,button{width:100%;padding:10px;margin-top:8px;}
+label{font-size:13px;color:#444;margin-top:10px;display:block;}
+input,select,button{width:100%;padding:10px;margin-top:5px;}
 button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
 .btn-sec{background:#455a64;margin-top:5px;}
 .hidden{display:none;}
 .despesa{border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
-table{border-collapse:collapse;width:100%;}
-th, td{border:1px solid #000;padding:5px;text-align:left;font-size:10px;}
-th{background:#eee;}
 </style>
 </head>
 
@@ -26,31 +24,19 @@ th{background:#eee;}
 
 <h1>Despesas Cirurtec</h1>
 
-<datalist id="cidades">
-  <option value="São Paulo - SP">
-  <option value="Campinas - SP">
-  <option value="Rio de Janeiro - RJ">
-  <option value="Belo Horizonte - MG">
-  <option value="Curitiba - PR">
-  <option value="Porto Alegre - RS">
-</datalist>
-
 <div class="card">
   <input id="nome" placeholder="Nome do técnico">
   <input id="email" type="email" placeholder="E-mail">
 </div>
 
 <div class="card">
+  <label>Data inicial</label>
   <input type="date" id="dataInicio">
-  <input type="date" id="dataFim">
-  <input type="number" id="adiantamento" placeholder="Valor do adiantamento (R$)">
-</div>
 
-<div class="card">
-  <h3>Roteiro da viagem</h3>
-  <input id="origem" list="cidades" placeholder="Ponto inicial (cidade)">
-  <button class="btn-sec" onclick="addParada()">➕ Adicionar ponto de parada</button>
-  <div id="paradas"></div>
+  <label>Data final</label>
+  <input type="date" id="dataFim">
+
+  <input type="number" id="adiantamento" placeholder="Valor do adiantamento (R$)">
 </div>
 
 <div class="card">
@@ -74,17 +60,10 @@ th{background:#eee;}
     <option>Jantar</option>
   </select>
 
-  <input type="number" id="qtd" class="hidden" min="1" max="6" placeholder="Quantidade (1 a 6)" onchange="calcularRefeicao()">
+  <input type="number" id="qtd" class="hidden" min="1" max="6" placeholder="Quantidade">
 
-  <input id="outrosTexto" class="hidden" placeholder="Especificar despesa">
+  <input id="outrosTexto" class="hidden">
   <input type="number" id="valorDespesa" placeholder="Valor (R$)">
-
-  <!-- Botões de anexos -->
-  <button class="btn-sec" onclick="camera.click()">📸 Tirar foto</button>
-  <input type="file" id="camera" accept="image/*" capture="environment" multiple hidden>
-
-  <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
-  <input type="file" id="galeria" accept="image/*" multiple hidden>
 
   <button onclick="addDespesa()">Adicionar despesa</button>
 </div>
@@ -95,173 +74,111 @@ th{background:#eee;}
 </div>
 
 <div class="card">
+  <h3>Anexos (comprovantes)</h3>
+
+  <button class="btn-sec" onclick="camera.click()">📸 Tirar foto</button>
+  <input type="file" id="camera" accept="image/*" capture="environment" multiple hidden>
+
+  <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
+  <input type="file" id="galeria" accept="image/*" multiple hidden>
+
+  <div id="listaAnexos"></div>
+</div>
+
+<div class="card">
   <button onclick="finalizar()">Finalizar viagem e gerar PDF</button>
 </div>
 
 <script>
-let despesas=[],paradas=[];
+let despesas=[];
+let anexos=[];
 
-// Funções auxiliares
-function formatarDataBR(data){
-  if(!data) return "";
-  const [y,m,d]=data.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-// Adicionar ponto de parada
-function addParada(){
-  const div=document.createElement("div");
-  div.innerHTML=`<input list="cidades" placeholder="Cidade de parada">`;
-  paradas.push(div);
-  document.getElementById("paradas").appendChild(div);
-}
-
-// Controle categoria e alimentação
+// ===== CONTROLES =====
 function controleCategoria(){
   refeicao.classList.toggle("hidden",categoria.value!=="Alimentação");
   qtd.classList.toggle("hidden",categoria.value!=="Alimentação");
   outrosTexto.classList.toggle("hidden",categoria.value!=="Outros");
-  valorDespesa.readOnly=false;
-  valorDespesa.value="";
 }
 
-function controleRefeicao(){ calcularRefeicao(); }
-
-function calcularRefeicao(){
-  const valores={
-    "Café da manhã":10,
-    "Almoço":10,
-    "Café da tarde":10,
-    "Jantar":40
-  };
-  if(valores[refeicao.value] && qtd.value){
-    valorDespesa.value = valores[refeicao.value]*qtd.value;
-    valorDespesa.readOnly = true;
-  }
-}
-
-// Adicionar despesa
+// ===== DESPESAS =====
 function addDespesa(){
-  if(!categoria.value || !valorDespesa.value) return alert("Preencha os dados");
+  if(!categoria.value || !valorDespesa.value){
+    alert("Preencha os dados da despesa");
+    return;
+  }
 
-  const arquivos=[...camera.files,...galeria.files].map(f=>new Promise(res=>{
+  const nomeCat = categoria.value==="Outros" && outrosTexto.value
+    ? outrosTexto.value
+    : categoria.value;
+
+  despesas.push({
+    categoria:nomeCat,
+    refeicao:refeicao.value,
+    qtd:qtd.value,
+    valor:parseFloat(valorDespesa.value)
+  });
+
+  lista.innerHTML += `
+    <div class="despesa">
+      ${nomeCat} ${refeicao.value ? "- "+refeicao.value : ""} – R$ ${valorDespesa.value}
+    </div>
+  `;
+
+  categoria.value=refeicao.value=qtd.value=valorDespesa.value=outrosTexto.value="";
+  controleCategoria();
+}
+
+// ===== ANEXOS =====
+function processarArquivos(files){
+  [...files].forEach(f=>{
     const r=new FileReader();
-    r.onload=e=>res(e.target.result);
+    r.onload=e=>{
+      anexos.push(e.target.result);
+      listaAnexos.innerHTML+=`📎 Imagem anexada<br>`;
+    };
     r.readAsDataURL(f);
-  }));
-
-  Promise.all(arquivos).then(imgs=>{
-    despesas.push({
-      categoria:categoria.value,
-      refeicao:refeicao.value,
-      qtd:qtd.value,
-      valor:parseFloat(valorDespesa.value),
-      outros:outrosTexto.value,
-      imagens:imgs
-    });
-
-    lista.innerHTML+=`
-      <div class="despesa">
-        ${categoria.value} ${refeicao.value ? "- "+refeicao.value : ""} ${qtd.value ? "("+qtd.value+")" : ""} – R$ ${valorDespesa.value}
-      </div>
-    `;
-
-    categoria.value=refeicao.value=qtd.value=valorDespesa.value=outrosTexto.value="";
-    camera.value=galeria.value="";
-    controleCategoria();
   });
 }
 
-// Borda PDF
-function desenharBorda(pdf){
-  pdf.rect(5,5,200,287);
-}
+camera.onchange = ()=>processarArquivos(camera.files);
+galeria.onchange = ()=>processarArquivos(galeria.files);
 
-// Gerar PDF completo com tabela
+// ===== PDF =====
 function finalizar(){
-  if(!confirm("Finalizar viagem e gerar PDF?")) return;
-
   const {jsPDF}=window.jspdf;
-  const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+  const pdf=new jsPDF();
   let y=15;
 
-  const adiant=parseFloat(adiantamento.value)||0;
+  pdf.text("Empresa: Cirurtec Hospitalar LTDA",10,y); y+=6;
+  pdf.text(`Técnico: ${nome.value}`,10,y); y+=6;
+  pdf.text(`Período: ${dataInicio.value} a ${dataFim.value}`,10,y); y+=6;
+
+  y+=6;
+  pdf.text("Resumo de despesas:",10,y); y+=6;
+
   let total=0;
-  let porCategoria={};
-
-  desenharBorda(pdf);
-  pdf.setFontSize(11);
-
-  // Cabeçalho
-  pdf.text("Empresa: Cirurtec Hospitalar LTDA",10,y);y+=6;
-  pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
-  pdf.text(`Período: ${formatarDataBR(dataInicio.value)} a ${formatarDataBR(dataFim.value)}`,10,y);y+=6;
-  pdf.text(`Ponto inicial: ${origem.value}`,10,y);y+=6;
-  paradas.forEach((p,i)=>{
-    pdf.text(`Parada ${i+1}: ${p.querySelector("input").value}`,10,y);y+=6;
-  });
-  y+=4;
-
-  // Tabela de despesas
-  const startX=10;
-  pdf.text("Despesas detalhadas:",startX,y); y+=5;
-  const colWidths=[50,40,20,25,25];
-  const colTitles=["Categoria","Refeição","Qtd","Valor unitário","Total"];
-  pdf.setFontSize(10);
-  // Cabeçalho tabela
-  let x=startX;
-  colTitles.forEach((t,i)=>{pdf.rect(x,y, colWidths[i],7); pdf.text(t,x+1,y+5); x+=colWidths[i];});
-  y+=7;
-
   despesas.forEach(d=>{
     total+=d.valor;
-    porCategoria[d.categoria]=(porCategoria[d.categoria]||0)+d.valor;
-
-    let x=startX;
-    const valorUnit = d.refeicao==="Jantar"?40: (d.refeicao==="Almoço"?10: (d.refeicao==="Café da tarde"?10: (d.refeicao==="Café da manhã"?10:d.valor)));
-    const qtd=parseInt(d.qtd)||1;
-    const totalItem=d.valor;
-
-    [d.categoria,d.refeicao||"",qtd.toString(),`R$ ${valorUnit.toFixed(2)}`,`R$ ${totalItem.toFixed(2)}`].forEach((txt,i)=>{
-      pdf.rect(x,y,colWidths[i],7);
-      pdf.text(txt,x+1,y+5);
-      x+=colWidths[i];
-    });
-    y+=7;
-    if(y>250){pdf.addPage();desenharBorda(pdf);y=15;}
+    pdf.text(`${d.categoria} - R$ ${d.valor.toFixed(2)}`,10,y);
+    y+=6;
   });
 
-  y+=4;
-  pdf.text("Resumo final:",startX,y);y+=6;
-  pdf.text(`Valor adiantado: R$ ${adiant.toFixed(2)}`,startX,y);y+=6;
-  pdf.text("Gastos por categoria:",startX,y);y+=6;
-  for(let c in porCategoria){
-    pdf.text(`${c}: R$ ${porCategoria[c].toFixed(2)}`,startX,y);y+=6;
-  }
-  y+=4;
-  pdf.text(`Valor total gasto: R$ ${total.toFixed(2)}`,startX,y);y+=6;
-  const saldo=adiant-total;
-  pdf.text(`Saldo final: R$ ${saldo.toFixed(2)} ${saldo<0?"(NEGATIVO)":""}`,startX,y);y+=6;
+  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);
 
-  // Anexos
-  pdf.addPage();
-  desenharBorda(pdf);
-  y=15;
-  pdf.text("Anexos:",startX,y);y+=10;
-  despesas.forEach(d=>{
-    d.imagens.forEach(img=>{
-      if(y>220){pdf.addPage();desenharBorda(pdf);y=15;}
-      pdf.addImage(img,"JPEG",startX,y,80,60);
+  // ===== ANEXOS NO PDF =====
+  if(anexos.length){
+    pdf.addPage();
+    y=15;
+    pdf.text("Anexos:",10,y); y+=10;
+
+    anexos.forEach(img=>{
+      if(y>220){ pdf.addPage(); y=15; }
+      pdf.addImage(img,"JPEG",10,y,90,65);
       y+=70;
     });
-  });
+  }
 
   pdf.save("Despesas_Cirurtec.pdf");
-
-  // Limpar tudo
-  despesas=[]; lista.innerHTML="";
-  paradas=[]; document.getElementById("paradas").innerHTML="";
-  origem.value=""; dataInicio.value=""; dataFim.value=""; adiantamento.value="";
 }
 </script>
 
