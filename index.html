@@ -5,78 +5,255 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Despesas Cirurtec</title>
 
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f172a">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body{font-family:Arial;margin:0;background:#f1f5f9}
-header{background:#0f172a;color:#fff;padding:15px;text-align:center}
-main{padding:15px}
-input,button{width:100%;padding:10px;margin:5px 0}
-button{background:#2563eb;color:#fff;border:none;border-radius:5px}
-.card{background:#fff;padding:15px;border-radius:8px;margin-bottom:10px}
-.total{font-weight:bold;margin-top:10px}
+body{font-family:Arial, sans-serif;background:#f4f4f4;padding:15px;}
+h1{text-align:center;}
+.card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px;}
+label{font-size:13px;color:#444;margin-top:10px;display:block;}
+input,select,button{width:100%;padding:10px;margin-top:5px;}
+button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
+.btn-sec{background:#455a64;margin-top:5px;}
+.hidden{display:none;}
+.despesa{border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
+table{border-collapse:collapse;width:100%;}
+th, td{border:1px solid #000;padding:5px;text-align:left;font-size:10px;}
+th{background:#eee;}
 </style>
 </head>
 
 <body>
-<header>
-<img src="logo.png" style="max-height:50px"><br>
-Despesas Cirurtec
-</header>
 
-<main>
+<h1>Despesas Cirurtec</h1>
+
+<datalist id="cidades">
+  <option value="São Paulo - SP">
+  <option value="Campinas - SP">
+  <option value="Rio de Janeiro - RJ">
+  <option value="Belo Horizonte - MG">
+  <option value="Curitiba - PR">
+  <option value="Porto Alegre - RS">
+</datalist>
 
 <div class="card">
-<h3>Nova Viagem</h3>
-<input id="viagem" placeholder="Descrição da viagem">
-<input id="adiantamento" type="number" placeholder="Valor do adiantamento">
-<button onclick="novaViagem()">Salvar</button>
+  <input id="nome" placeholder="Nome do técnico">
+  <input id="email" type="email" placeholder="E-mail">
 </div>
 
-<div id="viagens"></div>
+<div class="card">
+  <label>Data inicial</label>
+  <input type="date" id="dataInicio">
 
-</main>
+  <label>Data final</label>
+  <input type="date" id="dataFim">
+
+  <input type="number" id="adiantamento" placeholder="Valor do adiantamento (R$)">
+</div>
+
+<div class="card">
+  <h3>Roteiro da viagem</h3>
+  <input id="origem" list="cidades" placeholder="Ponto inicial (cidade)">
+  <button class="btn-sec" onclick="addParada()">➕ Adicionar ponto de parada</button>
+  <div id="paradas"></div>
+</div>
+
+<div class="card">
+  <h3>Nova despesa</h3>
+
+  <select id="categoria" onchange="controleCategoria()">
+    <option value="">Categoria</option>
+    <option>Alimentação</option>
+    <option>Combustível</option>
+    <option>Pedágios</option>
+    <option>Peças</option>
+    <option>Hospedagem</option>
+    <option>Outros</option>
+  </select>
+
+  <select id="refeicao" class="hidden" onchange="controleRefeicao()">
+    <option value="">Tipo de refeição</option>
+    <option>Café da manhã</option>
+    <option>Almoço</option>
+    <option>Café da tarde</option>
+    <option>Jantar</option>
+  </select>
+
+  <input type="number" id="qtd" class="hidden" min="1" max="6" placeholder="Quantidade (1 a 6)" onchange="calcularRefeicao()">
+
+  <!-- Campo Outros: livre -->
+  <input id="outrosTexto" class="hidden">
+
+  <input type="number" id="valorDespesa" placeholder="Valor (R$)">
+
+  <button class="btn-sec" onclick="camera.click()">📸 Tirar foto</button>
+  <input type="file" id="camera" accept="image/*" capture="environment" multiple hidden>
+
+  <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
+  <input type="file" id="galeria" accept="image/*" multiple hidden>
+
+  <button onclick="addDespesa()">Adicionar despesa</button>
+</div>
+
+<div class="card">
+  <h3>Despesas lançadas</h3>
+  <div id="lista"></div>
+</div>
+
+<div class="card">
+  <button onclick="finalizar()">Finalizar viagem e gerar PDF</button>
+</div>
 
 <script>
-let dados = JSON.parse(localStorage.getItem('dados') || '[]');
+let despesas=[],paradas=[];
 
-function novaViagem(){
- dados.push({
-   desc:viagem.value,
-   adiantamento:Number(adiantamento.value),
-   despesas:[]
- });
- localStorage.setItem('dados',JSON.stringify(dados));
- render();
+function formatarDataBR(data){
+  if(!data) return "";
+  const [y,m,d]=data.split("-");
+  return `${d}/${m}/${y}`;
 }
 
-function render(){
- viagens.innerHTML='';
- dados.forEach((v,i)=>{
-   let total=v.despesas.reduce((s,d)=>s+d.valor,0);
-   viagens.innerHTML+=`
-   <div class='card'>
-   <b>${v.desc}</b><br>
-   Adiantamento: R$ ${v.adiantamento.toFixed(2)}<br>
-   Total gasto: R$ ${total.toFixed(2)}<br>
-   Saldo: R$ ${(v.adiantamento-total).toFixed(2)}<br><br>
-   <input placeholder='Despesa' id='d${i}'>
-   <input type='number' placeholder='Valor' id='v${i}'>
-   <button onclick='addDespesa(${i})'>Adicionar despesa</button>
-   </div>`;
- });
+function addParada(){
+  const div=document.createElement("div");
+  div.innerHTML=`<input list="cidades" placeholder="Cidade de parada">`;
+  paradas.push(div);
+  document.getElementById("paradas").appendChild(div);
 }
 
-function addDespesa(i){
- let d=document.getElementById('d'+i).value;
- let v=Number(document.getElementById('v'+i).value);
- dados[i].despesas.push({desc:d,valor:v});
- localStorage.setItem('dados',JSON.stringify(dados));
- render();
+function controleCategoria(){
+  refeicao.classList.toggle("hidden",categoria.value!=="Alimentação");
+  qtd.classList.toggle("hidden",categoria.value!=="Alimentação");
+  outrosTexto.classList.toggle("hidden",categoria.value!=="Outros");
+  valorDespesa.readOnly=false;
+  valorDespesa.value="";
 }
 
-render();
+function controleRefeicao(){ calcularRefeicao(); }
+
+function calcularRefeicao(){
+  const valores={
+    "Café da manhã":10,
+    "Almoço":10,
+    "Café da tarde":10,
+    "Jantar":40
+  };
+  if(valores[refeicao.value] && qtd.value){
+    valorDespesa.value = valores[refeicao.value]*qtd.value;
+    valorDespesa.readOnly = true;
+  }
+}
+
+function addDespesa(){
+  if(!categoria.value || !valorDespesa.value) return alert("Preencha os dados");
+
+  const arquivos=[...camera.files,...galeria.files].map(f=>new Promise(res=>{
+    const r=new FileReader();
+    r.onload=e=>res(e.target.result);
+    r.readAsDataURL(f);
+  }));
+
+  Promise.all(arquivos).then(imgs=>{
+    const nomeCategoria =
+      categoria.value === "Outros" && outrosTexto.value
+      ? outrosTexto.value
+      : categoria.value;
+
+    despesas.push({
+      categoria:nomeCategoria,
+      refeicao:refeicao.value,
+      qtd:qtd.value,
+      valor:parseFloat(valorDespesa.value),
+      imagens:imgs
+    });
+
+    lista.innerHTML+=`
+      <div class="despesa">
+        ${nomeCategoria}
+        ${refeicao.value ? "- "+refeicao.value : ""}
+        ${qtd.value ? "("+qtd.value+")" : ""}
+        – R$ ${valorDespesa.value}
+      </div>
+    `;
+
+    categoria.value=refeicao.value=qtd.value=valorDespesa.value=outrosTexto.value="";
+    camera.value=galeria.value="";
+    controleCategoria();
+  });
+}
+
+function desenharBorda(pdf){
+  pdf.rect(5,5,200,287);
+}
+
+function finalizar(){
+  if(!confirm("Finalizar viagem e gerar PDF?")) return;
+
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+  let y=15;
+
+  const adiant=parseFloat(adiantamento.value)||0;
+  let total=0;
+  let porCategoria={};
+
+  desenharBorda(pdf);
+  pdf.setFontSize(11);
+
+  pdf.text("Empresa: Cirurtec Hospitalar LTDA",10,y);y+=6;
+  pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
+  pdf.text(`Período: ${formatarDataBR(dataInicio.value)} a ${formatarDataBR(dataFim.value)}`,10,y);y+=6;
+  pdf.text(`Ponto inicial: ${origem.value}`,10,y);y+=6;
+
+  paradas.forEach((p,i)=>{
+    pdf.text(`Parada ${i+1}: ${p.querySelector("input").value}`,10,y);y+=6;
+  });
+
+  y+=6;
+  pdf.text("Resumo final:",10,y);y+=6;
+  pdf.text(`Valor adiantado: R$ ${adiant.toFixed(2)}`,10,y);y+=6;
+
+  despesas.forEach(d=>{
+    total+=d.valor;
+    porCategoria[d.categoria]=(porCategoria[d.categoria]||0)+d.valor;
+  });
+
+  for(let c in porCategoria){
+    pdf.text(`${c}: R$ ${porCategoria[c].toFixed(2)}`,10,y);y+=6;
+  }
+
+  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);y+=6;
+  const saldo=adiant-total;
+  pdf.text(`Saldo final: R$ ${saldo.toFixed(2)} ${saldo<0?"(NEGATIVO)":""}`,10,y);
+
+  // ===== ANEXOS =====
+  pdf.addPage();
+  desenharBorda(pdf);
+  let yImg=15;
+  pdf.setFontSize(12);
+  pdf.text("Anexos das despesas",10,yImg);
+  yImg+=10;
+
+  despesas.forEach((d,i)=>{
+    if(d.imagens && d.imagens.length){
+      pdf.setFontSize(10);
+      pdf.text(`Despesa ${i+1} - ${d.categoria}`,10,yImg);
+      yImg+=6;
+
+      d.imagens.forEach(img=>{
+        if(yImg>220){
+          pdf.addPage();
+          desenharBorda(pdf);
+          yImg=15;
+        }
+        pdf.addImage(img,"JPEG",10,yImg,90,65);
+        yImg+=70;
+      });
+    }
+  });
+
+  pdf.save("Despesas_Cirurtec.pdf");
+}
 </script>
+
 </body>
 </html>
