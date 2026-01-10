@@ -8,15 +8,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body{font-family:Arial,sans-serif;background:#f4f4f4;padding:15px}
-h1{text-align:center}
-.card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px}
-label{font-size:13px;color:#444;display:block;margin-top:10px}
-input,select,button,textarea{width:100%;padding:10px;margin-top:5px}
-button{background:#1976d2;color:#fff;border:none;border-radius:6px}
-.btn-sec{background:#455a64}
-.hidden{display:none}
-.anexo{border-top:1px dashed #ccc;margin-top:8px;padding-top:8px;font-size:13px}
+body{font-family:Arial;background:#f4f4f4;padding:15px;}
+h1{text-align:center;}
+.card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px;}
+input,select,button,textarea{width:100%;padding:10px;margin-top:8px;}
+button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
+.btn-sec{background:#455a64;}
+.hidden{display:none;}
+.despesa{border-top:1px solid #ddd;padding-top:6px;margin-top:6px;}
 </style>
 </head>
 
@@ -30,12 +29,8 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
 </div>
 
 <div class="card">
-  <label>Data inicial</label>
   <input type="date" id="dataInicio">
-
-  <label>Data final</label>
   <input type="date" id="dataFim">
-
   <input type="number" id="adiantamento" placeholder="Valor do adiantamento (R$)">
 </div>
 
@@ -52,11 +47,25 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
     <option>Outros</option>
   </select>
 
-  <input id="outrosTexto" class="hidden" placeholder="Digite o nome da despesa">
+  <select id="refeicao" class="hidden" onchange="calcularRefeicao()">
+    <option value="">Tipo de refeição</option>
+    <option>Café da manhã</option>
+    <option>Almoço</option>
+    <option>Café da tarde</option>
+    <option>Jantar</option>
+  </select>
 
+  <input type="number" id="qtd" class="hidden" min="1" max="6" placeholder="Quantidade (1 a 6)" onchange="calcularRefeicao()">
+
+  <input id="outrosTexto" class="hidden" placeholder="Nome da despesa (livre)">
   <input type="number" id="valorDespesa" placeholder="Valor (R$)">
 
   <button onclick="addDespesa()">Adicionar despesa</button>
+</div>
+
+<div class="card">
+  <h3>Anexos da viagem</h3>
+  <input type="file" id="anexos" accept="image/*" multiple>
 </div>
 
 <div class="card">
@@ -64,104 +73,87 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
   <div id="lista"></div>
 </div>
 
-<!-- 🔥 ANEXOS NO LOCAL CORRETO -->
 <div class="card">
-  <h3>Anexos (comprovantes)</h3>
-
-  <button class="btn-sec" onclick="camera.click()">📸 Tirar foto</button>
-  <input type="file" id="camera" accept="image/*" capture="environment" hidden>
-
-  <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
-  <input type="file" id="galeria" accept="image/*" hidden>
-
-  <div id="listaAnexos"></div>
-</div>
-
-<div class="card">
-  <button onclick="finalizar()">Finalizar viagem e gerar PDF</button>
+  <button onclick="finalizar()">Finalizar e gerar PDF</button>
 </div>
 
 <script>
 let despesas=[];
-let anexos=[];
+
+const valoresRefeicao={
+  "Café da manhã":10,
+  "Almoço":10,
+  "Café da tarde":10,
+  "Jantar":40
+};
 
 function controleCategoria(){
+  refeicao.classList.toggle("hidden",categoria.value!=="Alimentação");
+  qtd.classList.toggle("hidden",categoria.value!=="Alimentação");
   outrosTexto.classList.toggle("hidden",categoria.value!=="Outros");
+  valorDespesa.readOnly=false;
+  valorDespesa.value="";
+}
+
+function calcularRefeicao(){
+  if(valoresRefeicao[refeicao.value] && qtd.value){
+    valorDespesa.value = valoresRefeicao[refeicao.value]*qtd.value;
+    valorDespesa.readOnly = true;
+  }
 }
 
 function addDespesa(){
-  if(!categoria.value||!valorDespesa.value)return;
+  if(!categoria.value || !valorDespesa.value) return alert("Preencha os dados");
 
-  const nome = categoria.value==="Outros" && outrosTexto.value
-    ? outrosTexto.value
-    : categoria.value;
+  despesas.push({
+    categoria:categoria.value,
+    refeicao:refeicao.value,
+    qtd:qtd.value || 1,
+    valor:parseFloat(valorDespesa.value),
+    outros:outrosTexto.value
+  });
 
-  despesas.push({categoria:nome,valor:parseFloat(valorDespesa.value)});
-  lista.innerHTML+=`<div>${nome} – R$ ${valorDespesa.value}</div>`;
+  lista.innerHTML+=`
+    <div class="despesa">
+      ${categoria.value}
+      ${refeicao.value ? " - "+refeicao.value : ""}
+      (${qtd.value || 1}) → R$ ${valorDespesa.value}
+    </div>
+  `;
 
-  categoria.value=valorDespesa.value=outrosTexto.value="";
+  categoria.value=refeicao.value=qtd.value=valorDespesa.value=outrosTexto.value="";
   controleCategoria();
 }
 
-// 📎 PROCESSAMENTO REAL DE IMAGENS
-function processarArquivo(file){
-  const reader=new FileReader();
-  reader.onload=e=>{
-    anexos.push({img:e.target.result,desc:""});
-    renderAnexos();
-  };
-  reader.readAsDataURL(file);
-}
-
-camera.onchange=()=>processarArquivo(camera.files[0]);
-galeria.onchange=()=>processarArquivo(galeria.files[0]);
-
-function renderAnexos(){
-  listaAnexos.innerHTML="";
-  anexos.forEach((a,i)=>{
-    listaAnexos.innerHTML+=`
-      <div class="anexo">
-        📎 Anexo ${i+1}
-        <textarea maxlength="100" placeholder="Descrição do anexo"
-          oninput="anexos[${i}].desc=this.value"></textarea>
-      </div>
-    `;
-  });
-}
-
-function finalizar(){
+async function finalizar(){
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF();
   let y=15;
 
-  pdf.text("Empresa: Cirurtec Hospitalar LTDA",10,y); y+=6;
-  pdf.text(`Técnico: ${nome.value}`,10,y); y+=6;
-  pdf.text(`Período: ${dataInicio.value} a ${dataFim.value}`,10,y); y+=10;
+  pdf.text("Empresa: Cirurtec Hospitalar LTDA",10,y);y+=6;
+  pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
+  pdf.text(`Período: ${dataInicio.value} a ${dataFim.value}`,10,y);y+=10;
 
   let total=0;
   despesas.forEach(d=>{
     total+=d.valor;
-    pdf.text(`${d.categoria} – R$ ${d.valor.toFixed(2)}`,10,y);
+    pdf.text(`${d.categoria} ${d.refeicao||""} (${d.qtd}) - R$ ${d.valor.toFixed(2)}`,10,y);
     y+=6;
   });
 
+  y+=6;
   pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);
 
-  // ✅ ANEXOS GARANTIDOS
-  if(anexos.length){
-    pdf.addPage();
-    y=15;
-    pdf.text("Anexos:",10,y); y+=10;
-
-    anexos.forEach(a=>{
-      if(y>220){pdf.addPage();y=15;}
-      pdf.addImage(a.img,"JPEG",10,y,90,65);
-      y+=70;
-      if(a.desc){
-        pdf.text(a.desc,10,y);
-        y+=10;
-      }
+  // anexos
+  const files=[...anexos.files];
+  for(const f of files){
+    const img=await new Promise(r=>{
+      const fr=new FileReader();
+      fr.onload=e=>r(e.target.result);
+      fr.readAsDataURL(f);
     });
+    pdf.addPage();
+    pdf.addImage(img,"JPEG",15,20,180,120);
   }
 
   pdf.save("Despesas_Cirurtec.pdf");
