@@ -3,20 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Despesas Cirurtec</title>
+<title>Despesas Cirurtec v2</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 body{font-family:Arial, sans-serif;background:#f4f4f4;padding:15px;}
 h1{text-align:center;}
 .card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px;}
 label{font-size:13px;color:#444;margin-top:10px;display:block;}
-input,select,button{width:100%;padding:10px;margin-top:5px;}
+input,select,button,textarea{width:100%;padding:10px;margin-top:5px;}
+textarea{resize:none;}
 button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
 .btn-sec{background:#455a64;margin-top:5px;}
 .hidden{display:none;}
 .despesa{border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
+.anexo{border-top:1px dashed #ccc;margin-top:10px;padding-top:10px;}
 </style>
 </head>
 
@@ -52,19 +54,9 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
     <option>Outros</option>
   </select>
 
-  <select id="refeicao" class="hidden" onchange="controleRefeicao()">
-    <option value="">Tipo de refeição</option>
-    <option>Café da manhã</option>
-    <option>Almoço</option>
-    <option>Café da tarde</option>
-    <option>Jantar</option>
-  </select>
-
-  <input type="number" id="qtd" class="hidden" min="1" max="6" placeholder="Quantidade">
-
   <input id="outrosTexto" class="hidden">
-  <input type="number" id="valorDespesa" placeholder="Valor (R$)">
 
+  <input type="number" id="valorDespesa" placeholder="Valor (R$)">
   <button onclick="addDespesa()">Adicionar despesa</button>
 </div>
 
@@ -77,10 +69,10 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
   <h3>Anexos (comprovantes)</h3>
 
   <button class="btn-sec" onclick="camera.click()">📸 Tirar foto</button>
-  <input type="file" id="camera" accept="image/*" capture="environment" multiple hidden>
+  <input type="file" id="camera" accept="image/*" capture="environment" hidden>
 
   <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
-  <input type="file" id="galeria" accept="image/*" multiple hidden>
+  <input type="file" id="galeria" accept="image/*" hidden>
 
   <div id="listaAnexos"></div>
 </div>
@@ -93,57 +85,49 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
 let despesas=[];
 let anexos=[];
 
-// ===== CONTROLES =====
 function controleCategoria(){
-  refeicao.classList.toggle("hidden",categoria.value!=="Alimentação");
-  qtd.classList.toggle("hidden",categoria.value!=="Alimentação");
   outrosTexto.classList.toggle("hidden",categoria.value!=="Outros");
 }
 
-// ===== DESPESAS =====
 function addDespesa(){
-  if(!categoria.value || !valorDespesa.value){
-    alert("Preencha os dados da despesa");
-    return;
-  }
+  if(!categoria.value || !valorDespesa.value) return;
 
   const nomeCat = categoria.value==="Outros" && outrosTexto.value
     ? outrosTexto.value
     : categoria.value;
 
-  despesas.push({
-    categoria:nomeCat,
-    refeicao:refeicao.value,
-    qtd:qtd.value,
-    valor:parseFloat(valorDespesa.value)
-  });
+  despesas.push({categoria:nomeCat,valor:parseFloat(valorDespesa.value)});
+  lista.innerHTML+=`<div class="despesa">${nomeCat} – R$ ${valorDespesa.value}</div>`;
 
-  lista.innerHTML += `
-    <div class="despesa">
-      ${nomeCat} ${refeicao.value ? "- "+refeicao.value : ""} – R$ ${valorDespesa.value}
-    </div>
-  `;
-
-  categoria.value=refeicao.value=qtd.value=valorDespesa.value=outrosTexto.value="";
+  categoria.value=valorDespesa.value=outrosTexto.value="";
   controleCategoria();
 }
 
-// ===== ANEXOS =====
-function processarArquivos(files){
-  [...files].forEach(f=>{
-    const r=new FileReader();
-    r.onload=e=>{
-      anexos.push(e.target.result);
-      listaAnexos.innerHTML+=`📎 Imagem anexada<br>`;
-    };
-    r.readAsDataURL(f);
+function processarAnexo(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    anexos.push({img:e.target.result,desc:""});
+    renderAnexos();
+  };
+  r.readAsDataURL(file);
+}
+
+camera.onchange=()=>processarAnexo(camera.files[0]);
+galeria.onchange=()=>processarAnexo(galeria.files[0]);
+
+function renderAnexos(){
+  listaAnexos.innerHTML="";
+  anexos.forEach((a,i)=>{
+    listaAnexos.innerHTML+=`
+      <div class="anexo">
+        📎 Anexo ${i+1}
+        <textarea maxlength="100" placeholder="Descrição do anexo"
+          oninput="anexos[${i}].desc=this.value"></textarea>
+      </div>
+    `;
   });
 }
 
-camera.onchange = ()=>processarArquivos(camera.files);
-galeria.onchange = ()=>processarArquivos(galeria.files);
-
-// ===== PDF =====
 function finalizar(){
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF();
@@ -151,30 +135,29 @@ function finalizar(){
 
   pdf.text("Empresa: Cirurtec Hospitalar LTDA",10,y); y+=6;
   pdf.text(`Técnico: ${nome.value}`,10,y); y+=6;
-  pdf.text(`Período: ${dataInicio.value} a ${dataFim.value}`,10,y); y+=6;
-
-  y+=6;
-  pdf.text("Resumo de despesas:",10,y); y+=6;
 
   let total=0;
   despesas.forEach(d=>{
     total+=d.valor;
-    pdf.text(`${d.categoria} - R$ ${d.valor.toFixed(2)}`,10,y);
+    pdf.text(`${d.categoria} – R$ ${d.valor.toFixed(2)}`,10,y);
     y+=6;
   });
 
   pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);
 
-  // ===== ANEXOS NO PDF =====
   if(anexos.length){
     pdf.addPage();
     y=15;
     pdf.text("Anexos:",10,y); y+=10;
 
-    anexos.forEach(img=>{
-      if(y>220){ pdf.addPage(); y=15; }
-      pdf.addImage(img,"JPEG",10,y,90,65);
-      y+=70;
+    anexos.forEach(a=>{
+      if(y>220){pdf.addPage();y=15;}
+      pdf.addImage(a.img,"JPEG",10,y,90,65);
+      y+=68;
+      if(a.desc){
+        pdf.text(a.desc,10,y);
+        y+=10;
+      }
     });
   }
 
