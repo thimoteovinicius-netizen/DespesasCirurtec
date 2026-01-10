@@ -11,11 +11,14 @@
 body{font-family:Arial;background:#f4f4f4;padding:15px;}
 h1{text-align:center;}
 .card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px;}
-input,select,button{width:100%;padding:10px;margin-top:8px;}
+input,select,textarea,button{width:100%;padding:10px;margin-top:8px;}
+textarea{resize:none;}
 button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
 .btn-sec{background:#455a64;}
 .hidden{display:none;}
 .despesa{border-top:1px solid #ddd;padding-top:6px;margin-top:6px;}
+.anexo{border-top:1px dashed #ccc;margin-top:8px;padding-top:8px;}
+.anexo small{color:#555;}
 </style>
 </head>
 
@@ -69,10 +72,12 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
   <h3>Anexos da viagem</h3>
 
   <button class="btn-sec" onclick="camera.click()">📸 Câmera</button>
-  <input type="file" id="camera" accept="image/*" capture="environment" multiple hidden>
+  <input type="file" id="camera" accept="image/*" capture="environment" hidden>
 
   <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
-  <input type="file" id="galeria" accept="image/*" multiple hidden>
+  <input type="file" id="galeria" accept="image/*" hidden>
+
+  <div id="listaAnexos"></div>
 </div>
 
 <div class="card">
@@ -97,40 +102,49 @@ const valoresFixos={
   "Veículo próprio":1.28
 };
 
-camera.onchange=galeria.onchange=()=>{
-  [...camera.files,...galeria.files].forEach(f=>{
-    const r=new FileReader();
-    r.onload=e=>anexos.push(e.target.result);
-    r.readAsDataURL(f);
-  });
-};
+function carregarAnexo(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    const obj={imagem:e.target.result,descricao:""};
+    anexos.push(obj);
+
+    const div=document.createElement("div");
+    div.className="anexo";
+    div.innerHTML=`
+      <small>Descrição do anexo</small>
+      <textarea maxlength="100" placeholder="Ex: Recibo do almoço"
+        oninput="anexos[${anexos.length-1}].descricao=this.value"></textarea>
+    `;
+    listaAnexos.appendChild(div);
+  };
+  r.readAsDataURL(file);
+}
+
+camera.onchange=()=>carregarAnexo(camera.files[0]);
+galeria.onchange=()=>carregarAnexo(galeria.files[0]);
 
 function controleCategoria(){
   refeicao.classList.add("hidden");
   qtd.classList.add("hidden");
   outrosTexto.classList.add("hidden");
-
   valorDespesa.readOnly=false;
   valorDespesa.value="";
 
   if(categoria.value==="Alimentação"){
     refeicao.classList.remove("hidden");
     qtd.classList.remove("hidden");
-    qtd.min=1; qtd.max=6;
+    qtd.min=1;qtd.max=6;
   }
-
   if(categoria.value==="Bônus de viagem"){
     qtd.classList.remove("hidden");
-    qtd.min=1; qtd.max=100;
+    qtd.min=1;qtd.max=100;
     valorDespesa.readOnly=true;
   }
-
   if(categoria.value==="Veículo próprio"){
     qtd.classList.remove("hidden");
-    qtd.min=1; qtd.max=5000;
+    qtd.min=1;qtd.max=5000;
     valorDespesa.readOnly=true;
   }
-
   if(categoria.value==="Outros"){
     outrosTexto.classList.remove("hidden");
   }
@@ -149,27 +163,19 @@ function calcularAutomatico(){
 }
 
 function addDespesa(){
-  if(!categoria.value || !valorDespesa.value) return alert("Preencha os dados");
-
+  if(!categoria.value||!valorDespesa.value) return alert("Preencha os dados");
   despesas.push({
     categoria:categoria.value,
     detalhe:refeicao.value||outrosTexto.value||"",
     qtd:qtd.value||1,
     valor:parseFloat(valorDespesa.value)
   });
-
-  lista.innerHTML+=`
-    <div class="despesa">
-      ${categoria.value} ${refeicao.value||outrosTexto.value||""}
-      (${qtd.value||1}) → R$ ${valorDespesa.value}
-    </div>
-  `;
-
+  lista.innerHTML+=`<div class="despesa">${categoria.value} ${refeicao.value||outrosTexto.value||""} (${qtd.value||1}) → R$ ${valorDespesa.value}</div>`;
   categoria.value=refeicao.value=qtd.value=valorDespesa.value=outrosTexto.value="";
   controleCategoria();
 }
 
-async function finalizar(){
+function finalizar(){
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF();
   let y=15,total=0;
@@ -187,10 +193,13 @@ async function finalizar(){
   y+=6;
   pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);
 
-  for(const img of anexos){
+  anexos.forEach(a=>{
     pdf.addPage();
-    pdf.addImage(img,"JPEG",15,20,180,120);
-  }
+    pdf.addImage(a.imagem,"JPEG",15,20,180,120);
+    if(a.descricao){
+      pdf.text(`Descrição: ${a.descricao}`,15,145);
+    }
+  });
 
   pdf.save("Despesas_Cirurtec.pdf");
 }
