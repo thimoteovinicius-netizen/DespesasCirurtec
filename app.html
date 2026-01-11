@@ -82,7 +82,7 @@ img{max-width:100%;border-radius:4px;}
   <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
   <input type="file" id="galeria" accept="image/*" hidden>
 
-  <textarea id="descAnexo" maxlength="200" placeholder="Descrição do anexo (opcional)"></textarea>
+  <textarea id="descAnexo" maxlength="200" placeholder="Descrição do anexo"></textarea>
   <button onclick="addAnexo()">Adicionar anexo</button>
 
   <div id="listaAnexos"></div>
@@ -96,7 +96,12 @@ img{max-width:100%;border-radius:4px;}
 let despesas=[];
 let anexos=[];
 
-// ===== CONTROLE DE CATEGORIA =====
+function formatarData(d){
+  if(!d) return "";
+  const [y,m,da]=d.split("-");
+  return `${da}/${m}/${y}`;
+}
+
 function controleCategoria(){
   refeicao.classList.add("hidden");
   quantidade.classList.add("hidden");
@@ -123,120 +128,122 @@ function controleCategoria(){
   }
 }
 
-// ===== VALORES FIXOS =====
 function calcularValor(){
-  const valores={
+  const v={
     "Café da manhã":10,
     "Almoço":10,
     "Café da tarde":10,
     "Jantar":40
   };
-  if(valores[refeicao.value]){
-    valorUnit.value=valores[refeicao.value];
+  if(v[refeicao.value]){
+    valorUnit.value=v[refeicao.value];
     valorUnit.readOnly=true;
   }
 }
 
-// ===== ADICIONAR DESPESA =====
 function addDespesa(){
-  if(!categoria.value||!valorUnit.value){
-    alert("Preencha a despesa");
-    return;
-  }
   const qtd=Number(quantidade.value)||1;
   const unit=Number(valorUnit.value);
-  const total=qtd*unit;
+  if(!categoria.value||!unit) return alert("Preencha corretamente");
 
+  const total=qtd*unit;
   despesas.push({
     categoria:categoria.value,
-    descricao:descricaoLivre.value||refeicao.value||"",
-    total
+    desc:descricaoLivre.value||refeicao.value||"",
+    qtd,unit,total
   });
 
   lista.innerHTML+=`<div class="despesa">${categoria.value} – R$ ${total.toFixed(2)}</div>`;
-
   categoria.value=refeicao.value=quantidade.value=descricaoLivre.value=valorUnit.value="";
   controleCategoria();
 }
 
-// ===== ADICIONAR ANEXO =====
 function addAnexo(){
-  const file = camera.files[0] || galeria.files[0];
-  if(!file){
-    alert("Selecione uma imagem");
-    return;
-  }
+  const file=camera.files[0]||galeria.files[0];
+  if(!file) return alert("Selecione uma imagem");
 
-  const reader=new FileReader();
-  reader.onload=e=>{
-    anexos.push({
-      img:e.target.result,
-      desc:descAnexo.value
-    });
-
+  const r=new FileReader();
+  r.onload=e=>{
+    anexos.push({img:e.target.result,desc:descAnexo.value});
     listaAnexos.innerHTML+=`
       <div class="anexo">
         <img src="${e.target.result}">
         <div>${descAnexo.value||"(sem descrição)"}</div>
-      </div>
-    `;
-    camera.value=galeria.value="";
-    descAnexo.value="";
+      </div>`;
+    camera.value=galeria.value=descAnexo.value="";
   };
-  reader.readAsDataURL(file);
+  r.readAsDataURL(file);
 }
 
-// ===== FINALIZAR =====
+function borda(pdf){
+  pdf.rect(5,5,200,287);
+}
+
 function finalizar(){
-  const adiant=Number(adiantamento.value);
-  if(isNaN(adiant)||adiant<=0){
-    alert("Informe o adiantamento");
-    return;
-  }
+  const ad=Number(adiantamento.value);
+  if(!ad) return alert("Informe o adiantamento");
 
   const total=despesas.reduce((s,d)=>s+d.total,0);
-  const saldo=adiant-total;
+  const saldo=ad-total;
 
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF();
-  let y=15;
+  let y=20;
 
-  pdf.text("Despesas Cirurtec",10,y);y+=8;
-  pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
-  pdf.text(`Valor adiantado: R$ ${adiant.toFixed(2)}`,10,y);y+=8;
+  borda(pdf);
 
-  despesas.forEach((d,i)=>{
-    pdf.text(`${i+1}. ${d.categoria} – R$ ${d.total.toFixed(2)}`,10,y);
-    y+=6;
-  });
+  pdf.setFontSize(16);
+  pdf.text("RELATÓRIO DE DESPESAS DE VIAGEM",105,y,{align:"center"});
+  y+=10;
 
-  y+=6;
-  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);y+=6;
+  pdf.setFontSize(11);
+  pdf.text("Empresa: Cirurtec Hospitalar LTDA",10,y); y+=6;
+  pdf.text(`Técnico: ${nome.value}`,10,y); y+=6;
+  pdf.text(`Período: ${formatarData(dataInicio.value)} a ${formatarData(dataFim.value)}`,10,y); y+=8;
+
+  pdf.setFontSize(12);
+  pdf.text("Resumo Financeiro",10,y); y+=6;
+  pdf.setFontSize(11);
+  pdf.text(`Valor adiantado: R$ ${ad.toFixed(2)}`,10,y); y+=6;
+  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y); y+=6;
+
+  pdf.setTextColor(saldo<0?255:0, saldo<0?0:128, 0);
   pdf.text(
-    saldo>=0
-      ? `Saldo restante: R$ ${saldo.toFixed(2)}`
-      : `Saldo negativo (reembolso): R$ ${Math.abs(saldo).toFixed(2)}`,
+    saldo<0
+      ? `Saldo negativo (reembolso): R$ ${Math.abs(saldo).toFixed(2)}`
+      : `Saldo restante: R$ ${saldo.toFixed(2)}`,
     10,y
   );
+  pdf.setTextColor(0,0,0);
+  y+=10;
 
-  // ===== ANEXOS NO PDF =====
+  pdf.setFontSize(12);
+  pdf.text("Despesas detalhadas",10,y); y+=6;
+  pdf.setFontSize(10);
+
+  despesas.forEach((d,i)=>{
+    pdf.text(`${i+1}. ${d.categoria} - ${d.desc} | Qtd: ${d.qtd} | Total: R$ ${d.total.toFixed(2)}`,10,y);
+    y+=6;
+    if(y>260){pdf.addPage();borda(pdf);y=20;}
+  });
+
   if(anexos.length){
-    pdf.addPage();
-    y=15;
-    pdf.text("Anexos",10,y);y+=8;
+    pdf.addPage();borda(pdf);y=20;
+    pdf.setFontSize(12);
+    pdf.text("Anexos",10,y); y+=10;
 
     anexos.forEach(a=>{
-      if(y>220){pdf.addPage();y=15;}
-      pdf.addImage(a.img,"JPEG",10,y,80,60);
+      if(y>210){pdf.addPage();borda(pdf);y=20;}
+      pdf.addImage(a.img,"JPEG",10,y,90,60);
       y+=65;
       if(a.desc){
-        pdf.text(a.desc,10,y);
-        y+=8;
+        pdf.setFontSize(10);
+        pdf.text(a.desc,10,y); y+=8;
       }
     });
   }
 
-  pdf.save("Despesas_Cirurtec.pdf");
+  pdf.save("Relatorio_Despesas_Cirurtec.pdf");
 }
 </script>
 
