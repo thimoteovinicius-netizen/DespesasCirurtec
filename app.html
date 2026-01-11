@@ -8,17 +8,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body{font-family:Arial;background:#f4f4f4;padding:15px;}
+body{font-family:Arial, sans-serif;background:#f4f4f4;padding:15px;}
 h1{text-align:center;}
 .card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px;}
-input,select,textarea,button{width:100%;padding:10px;margin-top:8px;}
-textarea{resize:none;}
+input,select,button{width:100%;padding:10px;margin-top:8px;}
 button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
-.btn-sec{background:#455a64;}
 .hidden{display:none;}
-.despesa{border-top:1px solid #ddd;padding-top:6px;margin-top:6px;}
-.anexo{border-top:1px dashed #ccc;margin-top:8px;padding-top:8px;}
-.anexo small{color:#555;}
+.despesa{border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
 </style>
 </head>
 
@@ -32,8 +28,12 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
 </div>
 
 <div class="card">
+  <label>Data inicial</label>
   <input type="date" id="dataInicio">
+
+  <label>Data final</label>
   <input type="date" id="dataFim">
+
   <input type="number" id="adiantamento" placeholder="Valor do adiantamento (R$)">
 </div>
 
@@ -52,7 +52,7 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
     <option>Outros</option>
   </select>
 
-  <select id="refeicao" class="hidden" onchange="calcularAutomatico()">
+  <select id="refeicao" class="hidden" onchange="calcularValor()">
     <option value="">Tipo de refeição</option>
     <option>Café da manhã</option>
     <option>Almoço</option>
@@ -60,24 +60,13 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
     <option>Jantar</option>
   </select>
 
-  <input type="number" id="qtd" class="hidden" placeholder="Quantidade" onchange="calcularAutomatico()">
+  <input type="number" id="qtd" class="hidden" min="1" placeholder="Quantidade">
 
-  <input id="outrosTexto" class="hidden" placeholder="Nome da despesa (livre)">
+  <input id="outrosTexto" class="hidden" placeholder="Descrição livre">
+
   <input type="number" id="valorDespesa" placeholder="Valor (R$)">
 
   <button onclick="addDespesa()">Adicionar despesa</button>
-</div>
-
-<div class="card">
-  <h3>Anexos da viagem</h3>
-
-  <button class="btn-sec" onclick="camera.click()">📸 Câmera</button>
-  <input type="file" id="camera" accept="image/*" capture="environment" hidden>
-
-  <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
-  <input type="file" id="galeria" accept="image/*" hidden>
-
-  <div id="listaAnexos"></div>
 </div>
 
 <div class="card">
@@ -86,42 +75,11 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
 </div>
 
 <div class="card">
-  <button onclick="finalizar()">Finalizar e gerar PDF</button>
+  <button onclick="finalizar()">Finalizar viagem e gerar PDF</button>
 </div>
 
 <script>
 let despesas=[];
-let anexos=[];
-
-const valoresFixos={
-  "Café da manhã":10,
-  "Almoço":10,
-  "Café da tarde":10,
-  "Jantar":40,
-  "Bônus de viagem":25,
-  "Veículo próprio":1.28
-};
-
-function carregarAnexo(file){
-  const r=new FileReader();
-  r.onload=e=>{
-    const obj={imagem:e.target.result,descricao:""};
-    anexos.push(obj);
-
-    const div=document.createElement("div");
-    div.className="anexo";
-    div.innerHTML=`
-      <small>Descrição do anexo</small>
-      <textarea maxlength="100" placeholder="Ex: Recibo do almoço"
-        oninput="anexos[${anexos.length-1}].descricao=this.value"></textarea>
-    `;
-    listaAnexos.appendChild(div);
-  };
-  r.readAsDataURL(file);
-}
-
-camera.onchange=()=>carregarAnexo(camera.files[0]);
-galeria.onchange=()=>carregarAnexo(galeria.files[0]);
 
 function controleCategoria(){
   refeicao.classList.add("hidden");
@@ -133,75 +91,90 @@ function controleCategoria(){
   if(categoria.value==="Alimentação"){
     refeicao.classList.remove("hidden");
     qtd.classList.remove("hidden");
-    qtd.min=1;qtd.max=6;
   }
+
   if(categoria.value==="Bônus de viagem"){
     qtd.classList.remove("hidden");
-    qtd.min=1;qtd.max=100;
-    valorDespesa.readOnly=true;
+    valorDespesa.value = 25;
+    valorDespesa.readOnly = true;
   }
+
   if(categoria.value==="Veículo próprio"){
     qtd.classList.remove("hidden");
-    qtd.min=1;qtd.max=5000;
-    valorDespesa.readOnly=true;
+    valorDespesa.value = 1.28;
+    valorDespesa.readOnly = true;
   }
+
   if(categoria.value==="Outros"){
     outrosTexto.classList.remove("hidden");
   }
 }
 
-function calcularAutomatico(){
-  let base=0;
-  if(categoria.value==="Alimentação") base=valoresFixos[refeicao.value]||0;
-  if(categoria.value==="Bônus de viagem") base=25;
-  if(categoria.value==="Veículo próprio") base=1.28;
-
-  if(base && qtd.value){
-    valorDespesa.value=(base*qtd.value).toFixed(2);
-    valorDespesa.readOnly=true;
+function calcularValor(){
+  const valores={
+    "Café da manhã":10,
+    "Almoço":10,
+    "Café da tarde":10,
+    "Jantar":40
+  };
+  if(valores[refeicao.value]){
+    valorDespesa.value = valores[refeicao.value];
+    valorDespesa.readOnly = true;
   }
 }
 
 function addDespesa(){
-  if(!categoria.value||!valorDespesa.value) return alert("Preencha os dados");
+  if(!categoria.value || !valorDespesa.value) return alert("Preencha a despesa");
+
+  const quantidade = parseInt(qtd.value)||1;
+  const valorUnit = parseFloat(valorDespesa.value);
+  const total = quantidade * valorUnit;
+
   despesas.push({
     categoria:categoria.value,
-    detalhe:refeicao.value||outrosTexto.value||"",
-    qtd:qtd.value||1,
-    valor:parseFloat(valorDespesa.value)
+    descricao: outrosTexto.value || refeicao.value || "",
+    quantidade,
+    total
   });
-  lista.innerHTML+=`<div class="despesa">${categoria.value} ${refeicao.value||outrosTexto.value||""} (${qtd.value||1}) → R$ ${valorDespesa.value}</div>`;
+
+  lista.innerHTML += `
+    <div class="despesa">
+      ${categoria.value} ${quantidade}x – R$ ${total.toFixed(2)}
+    </div>
+  `;
+
   categoria.value=refeicao.value=qtd.value=valorDespesa.value=outrosTexto.value="";
   controleCategoria();
 }
 
 function finalizar(){
+  if(!adiantamento.value) return alert("Informe o valor do adiantamento");
+
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF();
-  let y=15,total=0;
+  let y=15;
 
-  pdf.text("Empresa: Cirurtec Hospitalar LTDA",10,y);y+=6;
-  pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
-  pdf.text(`Período: ${dataInicio.value} a ${dataFim.value}`,10,y);y+=10;
+  let totalGasto = despesas.reduce((s,d)=>s+d.total,0);
+  let adiant = parseFloat(adiantamento.value);
+  let saldo = adiant - totalGasto;
 
-  despesas.forEach(d=>{
-    total+=d.valor;
-    pdf.text(`${d.categoria} ${d.detalhe} (${d.qtd}) - R$ ${d.valor.toFixed(2)}`,10,y);
+  pdf.text("Despesas Cirurtec",10,y); y+=8;
+  pdf.text(`Técnico: ${nome.value}`,10,y); y+=6;
+  pdf.text(`Período: ${dataInicio.value} a ${dataFim.value}`,10,y); y+=6;
+  pdf.text(`Valor adiantado: R$ ${adiant.toFixed(2)}`,10,y); y+=8;
+
+  despesas.forEach((d,i)=>{
+    pdf.text(`${i+1}. ${d.categoria} – R$ ${d.total.toFixed(2)}`,10,y);
     y+=6;
   });
 
   y+=6;
-  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);
-
-  anexos.forEach(a=>{
-    pdf.addPage();
-    pdf.addImage(a.imagem,"JPEG",15,20,180,120);
-    if(a.descricao){
-      pdf.text(`Descrição: ${a.descricao}`,15,145);
-    }
-  });
+  pdf.text(`Total gasto: R$ ${totalGasto.toFixed(2)}`,10,y); y+=6;
+  pdf.text(`Saldo final: R$ ${saldo.toFixed(2)} ${saldo<0?"(NEGATIVO)":""}`,10,y);
 
   pdf.save("Despesas_Cirurtec.pdf");
+
+  despesas=[]; lista.innerHTML="";
 }
 </script>
 
