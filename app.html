@@ -11,11 +11,13 @@
 body{font-family:Arial;background:#f4f4f4;padding:15px}
 h1{text-align:center}
 .card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px}
-input,select,button{width:100%;padding:10px;margin-top:8px}
+input,select,button,textarea{width:100%;padding:10px;margin-top:8px}
+textarea{resize:none}
 button{background:#1976d2;color:#fff;border:none;border-radius:6px}
 .btn-sec{background:#455a64}
 .hidden{display:none}
 .despesa{border-top:1px solid #ddd;margin-top:6px;padding-top:6px}
+.anexo{border:1px solid #ccc;padding:8px;margin-top:8px;border-radius:6px}
 </style>
 </head>
 
@@ -95,6 +97,8 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
 
   <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
   <input id="galeria" type="file" accept="image/*" multiple hidden>
+
+  <div id="listaAnexos"></div>
 </div>
 
 <div class="card">
@@ -113,10 +117,25 @@ function addParada(){
 camera.onchange = galeria.onchange = ()=>{
   [...camera.files, ...galeria.files].forEach(f=>{
     const r=new FileReader();
-    r.onload=e=>anexos.push(e.target.result);
+    r.onload=e=>{
+      anexos.push({img:e.target.result, desc:""});
+      renderAnexos();
+    };
     r.readAsDataURL(f);
   });
 };
+
+function renderAnexos(){
+  listaAnexos.innerHTML="";
+  anexos.forEach((a,i)=>{
+    listaAnexos.innerHTML+=`
+      <div class="anexo">
+        <img src="${a.img}" width="100%">
+        <textarea placeholder="Descrição da imagem (opcional)"
+          oninput="anexos[${i}].desc=this.value"></textarea>
+      </div>`;
+  });
+}
 
 function controleCategoria(){
   sub.classList.add("hidden");
@@ -130,12 +149,7 @@ function controleCategoria(){
     qtd.classList.remove("hidden");
   }
 
-  if(categoria.value==="Bônus de viagem"){
-    qtd.classList.remove("hidden");
-    calcularValor();
-  }
-
-  if(categoria.value==="Veículo próprio"){
+  if(categoria.value==="Bônus de viagem" || categoria.value==="Veículo próprio"){
     qtd.classList.remove("hidden");
     calcularValor();
   }
@@ -152,32 +166,17 @@ function controleCategoria(){
 
 function calcularValor(){
   const q = Number(qtd.value)||0;
-
   if(categoria.value==="Alimentação"){
-    const tabela={"Almoço":10,"Café da tarde":10,"Jantar":40};
-    if(tabela[sub.value] && q){
-      valor.value = tabela[sub.value]*q;
-    }
+    const t={"Almoço":10,"Café da tarde":10,"Jantar":40};
+    if(t[sub.value] && q) valor.value=t[sub.value]*q;
   }
-
-  if(categoria.value==="Bônus de viagem" && q){
-    valor.value = 25*q;
-  }
-
-  if(categoria.value==="Veículo próprio" && q){
-    valor.value = (1.28*q).toFixed(2);
-  }
+  if(categoria.value==="Bônus de viagem" && q) valor.value=25*q;
+  if(categoria.value==="Veículo próprio" && q) valor.value=(1.28*q).toFixed(2);
 }
 
 function addDespesa(){
   if(!categoria.value || !valor.value) return alert("Dados incompletos");
-
-  despesas.push({
-    categoria:categoria.value,
-    detalhe:sub.value||outros.value||"",
-    valor:Number(valor.value)
-  });
-
+  despesas.push({categoria:categoria.value, detalhe:sub.value||outros.value||"", valor:Number(valor.value)});
   lista.innerHTML+=`<div class="despesa">${categoria.value} – R$ ${valor.value}</div>`;
   categoria.value=sub.value=qtd.value=outros.value=valor.value="";
   controleCategoria();
@@ -193,27 +192,26 @@ function finalizar(){
 
   pdf.text("Cirurtec Hospitalar LTDA",10,y);y+=6;
   pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
+  pdf.text(`Trajeto:`,10,y);y+=6;
+  pdf.text(`Origem: ${origem.value}`,10,y);y+=6;
+  [...paradas.children].forEach((p,i)=>{pdf.text(`Parada ${i+1}: ${p.querySelector("input").value}`,10,y);y+=6});
+  pdf.text(`Destino: ${destino.value}`,10,y);y+=8;
 
-  despesas.forEach(d=>{
-    total+=d.valor;
-    pdf.text(`${d.categoria} ${d.detalhe} – R$ ${d.valor.toFixed(2)}`,10,y);
-    y+=6;
-  });
+  despesas.forEach(d=>{total+=d.valor;pdf.text(`${d.categoria} ${d.detalhe} – R$ ${d.valor.toFixed(2)}`,10,y);y+=6});
 
   y+=6;
   pdf.text(`Adiantamento: R$ ${ad.toFixed(2)}`,10,y);y+=6;
   pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);y+=6;
-
   const saldo=ad-total;
   pdf.text(`Saldo final: R$ ${saldo.toFixed(2)} ${saldo<0?"(NEGATIVO)":"(RESTANTE)"}`,10,y);
 
   if(anexos.length){
-    pdf.addPage();
-    y=10;
-    anexos.forEach(img=>{
-      if(y>230){pdf.addPage();y=10}
-      pdf.addImage(img,"JPEG",10,y,80,60);
-      y+=70;
+    pdf.addPage(); y=10;
+    anexos.forEach(a=>{
+      if(y>220){pdf.addPage();y=10}
+      pdf.addImage(a.img,"JPEG",10,y,80,60);
+      if(a.desc){pdf.text(a.desc,10,y+65)}
+      y+=75;
     });
   }
 
