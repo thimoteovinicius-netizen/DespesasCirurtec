@@ -8,35 +8,16 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body{
-  font-family: Arial, sans-serif;
-  background:#f4f4f4;
-  padding:15px;
-}
+body{font-family:Arial, sans-serif;background:#f4f4f4;padding:15px;}
 h1{text-align:center;}
-.card{
-  background:#fff;
-  padding:15px;
-  border-radius:8px;
-  margin-bottom:15px;
-}
-input,select,button{
-  width:100%;
-  padding:10px;
-  margin-top:8px;
-}
-button{
-  background:#1976d2;
-  color:#fff;
-  border:none;
-  border-radius:6px;
-}
+.card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px;}
+input,select,button,textarea{width:100%;padding:10px;margin-top:8px;}
+button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
+.btn-sec{background:#455a64;}
 .hidden{display:none;}
-.despesa{
-  border-top:1px solid #ddd;
-  margin-top:8px;
-  padding-top:8px;
-}
+.despesa{border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
+.anexo{border:1px dashed #aaa;padding:8px;margin-top:8px;font-size:12px;}
+img{max-width:100%;border-radius:4px;}
 </style>
 </head>
 
@@ -52,10 +33,8 @@ button{
 <div class="card">
   <label>Data inicial</label>
   <input type="date" id="dataInicio">
-
   <label>Data final</label>
   <input type="date" id="dataFim">
-
   <input type="number" id="adiantamento" placeholder="Valor do adiantamento (R$)">
 </div>
 
@@ -83,9 +62,7 @@ button{
   </select>
 
   <input type="number" id="quantidade" class="hidden" min="1" placeholder="Quantidade">
-
   <input id="descricaoLivre" class="hidden" placeholder="Descrição livre">
-
   <input type="number" id="valorUnit" placeholder="Valor unitário (R$)">
 
   <button onclick="addDespesa()">Adicionar despesa</button>
@@ -97,142 +74,169 @@ button{
 </div>
 
 <div class="card">
+  <h3>Anexos da viagem</h3>
+
+  <button class="btn-sec" onclick="camera.click()">📸 Câmera</button>
+  <input type="file" id="camera" accept="image/*" capture="environment" hidden>
+
+  <button class="btn-sec" onclick="galeria.click()">🖼️ Galeria</button>
+  <input type="file" id="galeria" accept="image/*" hidden>
+
+  <textarea id="descAnexo" maxlength="200" placeholder="Descrição do anexo (opcional)"></textarea>
+  <button onclick="addAnexo()">Adicionar anexo</button>
+
+  <div id="listaAnexos"></div>
+</div>
+
+<div class="card">
   <button onclick="finalizar()">Finalizar viagem e gerar PDF</button>
 </div>
 
 <script>
-let despesas = [];
+let despesas=[];
+let anexos=[];
 
 // ===== CONTROLE DE CATEGORIA =====
 function controleCategoria(){
   refeicao.classList.add("hidden");
   quantidade.classList.add("hidden");
   descricaoLivre.classList.add("hidden");
-  valorUnit.readOnly = false;
-  valorUnit.value = "";
+  valorUnit.readOnly=false;
+  valorUnit.value="";
 
-  if(categoria.value === "Alimentação"){
+  if(categoria.value==="Alimentação"){
     refeicao.classList.remove("hidden");
     quantidade.classList.remove("hidden");
   }
-
-  if(categoria.value === "Bônus de viagem"){
+  if(categoria.value==="Bônus de viagem"){
     quantidade.classList.remove("hidden");
-    valorUnit.value = 25;
-    valorUnit.readOnly = true;
+    valorUnit.value=25;
+    valorUnit.readOnly=true;
   }
-
-  if(categoria.value === "Veículo próprio"){
+  if(categoria.value==="Veículo próprio"){
     quantidade.classList.remove("hidden");
-    valorUnit.value = 1.28;
-    valorUnit.readOnly = true;
+    valorUnit.value=1.28;
+    valorUnit.readOnly=true;
   }
-
-  if(categoria.value === "Outros"){
+  if(categoria.value==="Outros"){
     descricaoLivre.classList.remove("hidden");
   }
 }
 
-// ===== VALORES FIXOS DE ALIMENTAÇÃO =====
+// ===== VALORES FIXOS =====
 function calcularValor(){
-  const valores = {
-    "Café da manhã": 10,
-    "Almoço": 10,
-    "Café da tarde": 10,
-    "Jantar": 40
+  const valores={
+    "Café da manhã":10,
+    "Almoço":10,
+    "Café da tarde":10,
+    "Jantar":40
   };
   if(valores[refeicao.value]){
-    valorUnit.value = valores[refeicao.value];
-    valorUnit.readOnly = true;
+    valorUnit.value=valores[refeicao.value];
+    valorUnit.readOnly=true;
   }
 }
 
 // ===== ADICIONAR DESPESA =====
 function addDespesa(){
-  if(!categoria.value || !valorUnit.value){
-    alert("Preencha a despesa corretamente");
+  if(!categoria.value||!valorUnit.value){
+    alert("Preencha a despesa");
     return;
   }
-
-  const qtd = Number(quantidade.value) || 1;
-  const unit = Number(valorUnit.value);
-  const total = qtd * unit;
+  const qtd=Number(quantidade.value)||1;
+  const unit=Number(valorUnit.value);
+  const total=qtd*unit;
 
   despesas.push({
-    categoria: categoria.value,
-    descricao: descricaoLivre.value || refeicao.value || "",
-    quantidade: qtd,
-    valorUnit: unit,
-    total: total
+    categoria:categoria.value,
+    descricao:descricaoLivre.value||refeicao.value||"",
+    total
   });
 
-  lista.innerHTML += `
-    <div class="despesa">
-      ${categoria.value} ${qtd}x – R$ ${total.toFixed(2)}
-    </div>
-  `;
+  lista.innerHTML+=`<div class="despesa">${categoria.value} – R$ ${total.toFixed(2)}</div>`;
 
-  categoria.value = "";
-  refeicao.value = "";
-  quantidade.value = "";
-  descricaoLivre.value = "";
-  valorUnit.value = "";
+  categoria.value=refeicao.value=quantidade.value=descricaoLivre.value=valorUnit.value="";
   controleCategoria();
 }
 
-// ===== FINALIZAR E GERAR PDF =====
+// ===== ADICIONAR ANEXO =====
+function addAnexo(){
+  const file = camera.files[0] || galeria.files[0];
+  if(!file){
+    alert("Selecione uma imagem");
+    return;
+  }
+
+  const reader=new FileReader();
+  reader.onload=e=>{
+    anexos.push({
+      img:e.target.result,
+      desc:descAnexo.value
+    });
+
+    listaAnexos.innerHTML+=`
+      <div class="anexo">
+        <img src="${e.target.result}">
+        <div>${descAnexo.value||"(sem descrição)"}</div>
+      </div>
+    `;
+    camera.value=galeria.value="";
+    descAnexo.value="";
+  };
+  reader.readAsDataURL(file);
+}
+
+// ===== FINALIZAR =====
 function finalizar(){
-  const adiant = Number(adiantamento.value);
-
-  if(isNaN(adiant) || adiant <= 0){
-    alert("Informe corretamente o valor do adiantamento");
+  const adiant=Number(adiantamento.value);
+  if(isNaN(adiant)||adiant<=0){
+    alert("Informe o adiantamento");
     return;
   }
 
-  if(despesas.length === 0){
-    alert("Nenhuma despesa lançada");
-    return;
-  }
+  const total=despesas.reduce((s,d)=>s+d.total,0);
+  const saldo=adiant-total;
 
-  const totalGasto = despesas.reduce((s,d)=>s+d.total,0);
-  const saldo = adiant - totalGasto;
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF();
+  let y=15;
 
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF();
-  let y = 15;
-
-  pdf.setFontSize(12);
-  pdf.text("Despesas Cirurtec",10,y); y+=8;
-  pdf.setFontSize(10);
-
-  pdf.text(`Técnico: ${nome.value}`,10,y); y+=6;
-  pdf.text(`Período: ${dataInicio.value} a ${dataFim.value}`,10,y); y+=6;
-  pdf.text(`Valor adiantado: R$ ${adiant.toFixed(2)}`,10,y); y+=8;
-
-  pdf.text("Despesas:",10,y); y+=6;
+  pdf.text("Despesas Cirurtec",10,y);y+=8;
+  pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
+  pdf.text(`Valor adiantado: R$ ${adiant.toFixed(2)}`,10,y);y+=8;
 
   despesas.forEach((d,i)=>{
-    pdf.text(
-      `${i+1}. ${d.categoria} – R$ ${d.total.toFixed(2)}`,
-      10, y
-    );
+    pdf.text(`${i+1}. ${d.categoria} – R$ ${d.total.toFixed(2)}`,10,y);
     y+=6;
   });
 
   y+=6;
-  pdf.text(`Total gasto: R$ ${totalGasto.toFixed(2)}`,10,y); y+=6;
+  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);y+=6;
+  pdf.text(
+    saldo>=0
+      ? `Saldo restante: R$ ${saldo.toFixed(2)}`
+      : `Saldo negativo (reembolso): R$ ${Math.abs(saldo).toFixed(2)}`,
+    10,y
+  );
 
-  if(saldo >= 0){
-    pdf.text(`Saldo restante: R$ ${saldo.toFixed(2)}`,10,y);
-  } else {
-    pdf.text(`Saldo negativo (reembolso): R$ ${Math.abs(saldo).toFixed(2)}`,10,y);
+  // ===== ANEXOS NO PDF =====
+  if(anexos.length){
+    pdf.addPage();
+    y=15;
+    pdf.text("Anexos",10,y);y+=8;
+
+    anexos.forEach(a=>{
+      if(y>220){pdf.addPage();y=15;}
+      pdf.addImage(a.img,"JPEG",10,y,80,60);
+      y+=65;
+      if(a.desc){
+        pdf.text(a.desc,10,y);
+        y+=8;
+      }
+    });
   }
 
   pdf.save("Despesas_Cirurtec.pdf");
-
-  // Limpar
-  despesas = [];
-  lista.innerHTML = "";
 }
 </script>
 
