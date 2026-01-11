@@ -8,13 +8,35 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body{font-family:Arial, sans-serif;background:#f4f4f4;padding:15px;}
+body{
+  font-family: Arial, sans-serif;
+  background:#f4f4f4;
+  padding:15px;
+}
 h1{text-align:center;}
-.card{background:#fff;padding:15px;border-radius:8px;margin-bottom:15px;}
-input,select,button{width:100%;padding:10px;margin-top:8px;}
-button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
+.card{
+  background:#fff;
+  padding:15px;
+  border-radius:8px;
+  margin-bottom:15px;
+}
+input,select,button{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+}
+button{
+  background:#1976d2;
+  color:#fff;
+  border:none;
+  border-radius:6px;
+}
 .hidden{display:none;}
-.despesa{border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
+.despesa{
+  border-top:1px solid #ddd;
+  margin-top:8px;
+  padding-top:8px;
+}
 </style>
 </head>
 
@@ -60,11 +82,11 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
     <option>Jantar</option>
   </select>
 
-  <input type="number" id="qtd" class="hidden" min="1" placeholder="Quantidade">
+  <input type="number" id="quantidade" class="hidden" min="1" placeholder="Quantidade">
 
-  <input id="outrosTexto" class="hidden" placeholder="Descrição livre">
+  <input id="descricaoLivre" class="hidden" placeholder="Descrição livre">
 
-  <input type="number" id="valorDespesa" placeholder="Valor (R$)">
+  <input type="number" id="valorUnit" placeholder="Valor unitário (R$)">
 
   <button onclick="addDespesa()">Adicionar despesa</button>
 </div>
@@ -79,102 +101,138 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px;}
 </div>
 
 <script>
-let despesas=[];
+let despesas = [];
 
+// ===== CONTROLE DE CATEGORIA =====
 function controleCategoria(){
   refeicao.classList.add("hidden");
-  qtd.classList.add("hidden");
-  outrosTexto.classList.add("hidden");
-  valorDespesa.readOnly=false;
-  valorDespesa.value="";
+  quantidade.classList.add("hidden");
+  descricaoLivre.classList.add("hidden");
+  valorUnit.readOnly = false;
+  valorUnit.value = "";
 
-  if(categoria.value==="Alimentação"){
+  if(categoria.value === "Alimentação"){
     refeicao.classList.remove("hidden");
-    qtd.classList.remove("hidden");
+    quantidade.classList.remove("hidden");
   }
 
-  if(categoria.value==="Bônus de viagem"){
-    qtd.classList.remove("hidden");
-    valorDespesa.value = 25;
-    valorDespesa.readOnly = true;
+  if(categoria.value === "Bônus de viagem"){
+    quantidade.classList.remove("hidden");
+    valorUnit.value = 25;
+    valorUnit.readOnly = true;
   }
 
-  if(categoria.value==="Veículo próprio"){
-    qtd.classList.remove("hidden");
-    valorDespesa.value = 1.28;
-    valorDespesa.readOnly = true;
+  if(categoria.value === "Veículo próprio"){
+    quantidade.classList.remove("hidden");
+    valorUnit.value = 1.28;
+    valorUnit.readOnly = true;
   }
 
-  if(categoria.value==="Outros"){
-    outrosTexto.classList.remove("hidden");
+  if(categoria.value === "Outros"){
+    descricaoLivre.classList.remove("hidden");
   }
 }
 
+// ===== VALORES FIXOS DE ALIMENTAÇÃO =====
 function calcularValor(){
-  const valores={
-    "Café da manhã":10,
-    "Almoço":10,
-    "Café da tarde":10,
-    "Jantar":40
+  const valores = {
+    "Café da manhã": 10,
+    "Almoço": 10,
+    "Café da tarde": 10,
+    "Jantar": 40
   };
   if(valores[refeicao.value]){
-    valorDespesa.value = valores[refeicao.value];
-    valorDespesa.readOnly = true;
+    valorUnit.value = valores[refeicao.value];
+    valorUnit.readOnly = true;
   }
 }
 
+// ===== ADICIONAR DESPESA =====
 function addDespesa(){
-  if(!categoria.value || !valorDespesa.value) return alert("Preencha a despesa");
+  if(!categoria.value || !valorUnit.value){
+    alert("Preencha a despesa corretamente");
+    return;
+  }
 
-  const quantidade = parseInt(qtd.value)||1;
-  const valorUnit = parseFloat(valorDespesa.value);
-  const total = quantidade * valorUnit;
+  const qtd = Number(quantidade.value) || 1;
+  const unit = Number(valorUnit.value);
+  const total = qtd * unit;
 
   despesas.push({
-    categoria:categoria.value,
-    descricao: outrosTexto.value || refeicao.value || "",
-    quantidade,
-    total
+    categoria: categoria.value,
+    descricao: descricaoLivre.value || refeicao.value || "",
+    quantidade: qtd,
+    valorUnit: unit,
+    total: total
   });
 
   lista.innerHTML += `
     <div class="despesa">
-      ${categoria.value} ${quantidade}x – R$ ${total.toFixed(2)}
+      ${categoria.value} ${qtd}x – R$ ${total.toFixed(2)}
     </div>
   `;
 
-  categoria.value=refeicao.value=qtd.value=valorDespesa.value=outrosTexto.value="";
+  categoria.value = "";
+  refeicao.value = "";
+  quantidade.value = "";
+  descricaoLivre.value = "";
+  valorUnit.value = "";
   controleCategoria();
 }
 
+// ===== FINALIZAR E GERAR PDF =====
 function finalizar(){
-  if(!adiantamento.value) return alert("Informe o valor do adiantamento");
+  const adiant = Number(adiantamento.value);
 
-  const {jsPDF}=window.jspdf;
-  const pdf=new jsPDF();
-  let y=15;
+  if(isNaN(adiant) || adiant <= 0){
+    alert("Informe corretamente o valor do adiantamento");
+    return;
+  }
 
-  let totalGasto = despesas.reduce((s,d)=>s+d.total,0);
-  let adiant = parseFloat(adiantamento.value);
-  let saldo = adiant - totalGasto;
+  if(despesas.length === 0){
+    alert("Nenhuma despesa lançada");
+    return;
+  }
 
+  const totalGasto = despesas.reduce((s,d)=>s+d.total,0);
+  const saldo = adiant - totalGasto;
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF();
+  let y = 15;
+
+  pdf.setFontSize(12);
   pdf.text("Despesas Cirurtec",10,y); y+=8;
+  pdf.setFontSize(10);
+
   pdf.text(`Técnico: ${nome.value}`,10,y); y+=6;
   pdf.text(`Período: ${dataInicio.value} a ${dataFim.value}`,10,y); y+=6;
   pdf.text(`Valor adiantado: R$ ${adiant.toFixed(2)}`,10,y); y+=8;
 
+  pdf.text("Despesas:",10,y); y+=6;
+
   despesas.forEach((d,i)=>{
-    pdf.text(`${i+1}. ${d.categoria} – R$ ${d.total.toFixed(2)}`,10,y);
+    pdf.text(
+      `${i+1}. ${d.categoria} – R$ ${d.total.toFixed(2)}`,
+      10, y
+    );
     y+=6;
   });
 
   y+=6;
   pdf.text(`Total gasto: R$ ${totalGasto.toFixed(2)}`,10,y); y+=6;
-  pdf.text(`Saldo final: R$ ${saldo.toFixed(2)} ${saldo<0?"(NEGATIVO)":""}`,10,y);
+
+  if(saldo >= 0){
+    pdf.text(`Saldo restante: R$ ${saldo.toFixed(2)}`,10,y);
+  } else {
+    pdf.text(`Saldo negativo (reembolso): R$ ${Math.abs(saldo).toFixed(2)}`,10,y);
+  }
 
   pdf.save("Despesas_Cirurtec.pdf");
 
-  despesas=[]; lista.innerHTML="";
+  // Limpar
+  despesas = [];
+  lista.innerHTML = "";
 }
 </script>
 
