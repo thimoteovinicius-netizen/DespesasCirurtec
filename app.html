@@ -26,6 +26,8 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
 <!-- DATALIST MG -->
 <datalist id="cidades-mg">
   <option value="Belo Horizonte - MG">
+  <option value="Contagem - MG">
+  <option value="Betim - MG">
   <option value="Uberlândia - MG">
   <option value="Uberaba - MG">
   <option value="Juiz de Fora - MG">
@@ -33,13 +35,17 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
   <option value="Sete Lagoas - MG">
   <option value="Montes Claros - MG">
   <option value="Poços de Caldas - MG">
+  <option value="Varginha - MG">
+  <option value="Pouso Alegre - MG">
 </datalist>
 
+<!-- TÉCNICO -->
 <div class="card">
   <input id="nome" placeholder="Nome do técnico">
   <input id="email" placeholder="E-mail">
 </div>
 
+<!-- PERÍODO -->
 <div class="card">
   <label>Data início</label>
   <input type="date" id="dataInicio">
@@ -48,12 +54,19 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
   <input type="number" id="adiantamento" placeholder="Valor do adiantamento (R$)">
 </div>
 
+<!-- TRAJETO -->
 <div class="card">
-  <h3>Trajeto</h3>
+  <h3>Trajeto da viagem</h3>
+
   <input list="cidades-mg" id="origem" placeholder="Ponto inicial">
+
+  <button class="btn-sec" onclick="addParada()">➕ Adicionar parada</button>
+  <div id="paradas"></div>
+
   <input list="cidades-mg" id="destino" placeholder="Destino final">
 </div>
 
+<!-- DESPESAS -->
 <div class="card">
   <h3>Nova despesa</h3>
 
@@ -69,9 +82,9 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
     <option>Outros</option>
   </select>
 
+  <!-- Alimentação (SEM café da manhã) -->
   <select id="sub" class="hidden" onchange="calcular()">
-    <option value="">Selecione</option>
-    <option>Café da manhã</option>
+    <option value="">Selecione a refeição</option>
     <option>Almoço</option>
     <option>Café da tarde</option>
     <option>Jantar</option>
@@ -81,6 +94,7 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
   <input id="outros" class="hidden" placeholder="Descrição livre">
   <input id="valor" type="number" placeholder="Valor (R$)" readonly>
 
+  <!-- ANEXOS -->
   <button class="btn-sec" onclick="camera.click()">📸 Câmera</button>
   <input id="camera" type="file" accept="image/*" capture="environment" multiple hidden>
 
@@ -90,17 +104,24 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
   <button onclick="addDespesa()">Adicionar despesa</button>
 </div>
 
+<!-- LISTA -->
 <div class="card">
-  <h3>Despesas</h3>
+  <h3>Despesas lançadas</h3>
   <div id="lista"></div>
 </div>
 
 <div class="card">
-  <button onclick="finalizar()">Finalizar e gerar PDF</button>
+  <button onclick="finalizar()">Finalizar viagem e gerar PDF</button>
 </div>
 
 <script>
 let despesas=[];
+
+function addParada(){
+  const div=document.createElement("div");
+  div.innerHTML=`<input list="cidades-mg" placeholder="Cidade de parada">`;
+  document.getElementById("paradas").appendChild(div);
+}
 
 function controleCategoria(){
   sub.classList.add("hidden");
@@ -136,7 +157,6 @@ function controleCategoria(){
 
 function calcular(){
   const tabela={
-    "Café da manhã":10,
     "Almoço":10,
     "Café da tarde":10,
     "Jantar":40
@@ -162,6 +182,7 @@ function addDespesa(){
     });
 
     lista.innerHTML+=`<div class="despesa">${categoria.value} – R$ ${valor.value}</div>`;
+
     categoria.value=sub.value=qtd.value=outros.value=valor.value="";
     camera.value=galeria.value="";
     controleCategoria();
@@ -178,6 +199,13 @@ function finalizar(){
 
   pdf.text("Cirurtec Hospitalar LTDA",10,y);y+=6;
   pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
+  pdf.text(`Origem: ${origem.value}`,10,y);y+=6;
+
+  document.querySelectorAll("#paradas input").forEach((p,i)=>{
+    pdf.text(`Parada ${i+1}: ${p.value}`,10,y);y+=6;
+  });
+
+  pdf.text(`Destino: ${destino.value}`,10,y);y+=8;
 
   despesas.forEach(d=>{
     total+=d.valor;
@@ -186,7 +214,7 @@ function finalizar(){
   });
 
   y+=6;
-  pdf.text(`Adiantamento: R$ ${ad.toFixed(2)}`,10,y);y+=6;
+  pdf.text(`Valor adiantado: R$ ${ad.toFixed(2)}`,10,y);y+=6;
   pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);y+=6;
 
   const saldo=ad-total;
