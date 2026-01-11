@@ -111,29 +111,28 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
 </div>
 
 <script>
-let despesas = [], anexos = [];
+let despesas=[], anexos=[];
 
 function addParada(){
-  const d = document.createElement("div");
-  d.innerHTML = `<input list="cidades-mg" placeholder="Cidade de parada">`;
+  const d=document.createElement("div");
+  d.innerHTML=`<input list="cidades-mg" placeholder="Cidade de parada">`;
   paradas.appendChild(d);
 }
 
-/* === CORREÇÃO DEFINITIVA DE DUPLICAÇÃO === */
 function processarArquivos(input){
   [...input.files].forEach(f=>{
-    const r = new FileReader();
-    r.onload = e=>{
-      anexos.push({ img: e.target.result, desc: "" });
+    const r=new FileReader();
+    r.onload=e=>{
+      anexos.push({img:e.target.result, desc:""});
       renderAnexos();
     };
     r.readAsDataURL(f);
   });
-  input.value = "";
+  input.value="";
 }
 
-camera.onchange = () => processarArquivos(camera);
-galeria.onchange = () => processarArquivos(galeria);
+camera.onchange=()=>processarArquivos(camera);
+galeria.onchange=()=>processarArquivos(galeria);
 
 function renderAnexos(){
   listaAnexos.innerHTML="";
@@ -159,7 +158,7 @@ function controleCategoria(){
     qtd.classList.remove("hidden");
   }
 
-  if(categoria.value==="Bônus de viagem" || categoria.value==="Veículo próprio"){
+  if(["Bônus de viagem","Veículo próprio"].includes(categoria.value)){
     qtd.classList.remove("hidden");
     calcularValor();
   }
@@ -175,21 +174,23 @@ function controleCategoria(){
 }
 
 function calcularValor(){
-  const q = Number(qtd.value)||0;
+  const q=Number(qtd.value)||0;
   if(categoria.value==="Alimentação"){
-    const t={"Almoço":10,"Café da tarde":10,"Jantar":40};
-    if(t[sub.value] && q) valor.value=t[sub.value]*q;
+    const t={Almoço:10,"Café da tarde":10,Jantar:40};
+    if(t[sub.value]&&q) valor.value=t[sub.value]*q;
   }
-  if(categoria.value==="Bônus de viagem" && q) valor.value=25*q;
-  if(categoria.value==="Veículo próprio" && q) valor.value=(1.28*q).toFixed(2);
+  if(categoria.value==="Bônus de viagem"&&q) valor.value=25*q;
+  if(categoria.value==="Veículo próprio"&&q) valor.value=(1.28*q).toFixed(2);
 }
 
 function addDespesa(){
-  if(!categoria.value || !valor.value) return alert("Dados incompletos");
+  if(!categoria.value||!valor.value) return alert("Dados incompletos");
   despesas.push({
     categoria:categoria.value,
     detalhe:sub.value||outros.value||"",
-    valor:Number(valor.value)
+    quantidade:Number(qtd.value)||1,
+    valorUnitario:Number(valor.value)/(Number(qtd.value)||1),
+    valorTotal:Number(valor.value)
   });
   lista.innerHTML+=`<div class="despesa">${categoria.value} – R$ ${valor.value}</div>`;
   categoria.value=sub.value=qtd.value=outros.value=valor.value="";
@@ -197,47 +198,68 @@ function addDespesa(){
 }
 
 function finalizar(){
-  const ad = Number(adiantamento.value);
+  const ad=Number(adiantamento.value);
   if(!ad) return alert("Informe o adiantamento");
 
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF();
   let y=10,total=0;
 
-  pdf.text("Cirurtec Hospitalar LTDA",10,y);y+=6;
-  pdf.text(`Técnico: ${nome.value}`,10,y);y+=6;
-  pdf.text(`Trajeto:`,10,y);y+=6;
-  pdf.text(`Origem: ${origem.value}`,10,y);y+=6;
+  pdf.setFontSize(12);
+  pdf.text("Cirurtec Hospitalar LTDA",10,y);y+=8;
+
+  pdf.setFontSize(10);
+  pdf.text(`Técnico: ${nome.value}`,10,y);y+=5;
+  pdf.text(`E-mail: ${email.value}`,10,y);y+=5;
+  pdf.text(`Data início: ${dataInicio.value}`,10,y);y+=5;
+  pdf.text(`Data final: ${dataFim.value}`,10,y);y+=8;
+
+  pdf.text("Trajeto",10,y);y+=5;
+  pdf.text(`Origem: ${origem.value}`,10,y);y+=5;
   [...paradas.children].forEach((p,i)=>{
     pdf.text(`Parada ${i+1}: ${p.querySelector("input").value}`,10,y);
-    y+=6;
+    y+=5;
   });
   pdf.text(`Destino: ${destino.value}`,10,y);y+=8;
 
+  const porCategoria={};
   despesas.forEach(d=>{
-    total+=d.valor;
-    pdf.text(`${d.categoria} ${d.detalhe} – R$ ${d.valor.toFixed(2)}`,10,y);
-    y+=6;
+    if(!porCategoria[d.categoria]) porCategoria[d.categoria]=[];
+    porCategoria[d.categoria].push(d);
+    total+=d.valorTotal;
   });
 
-  y+=6;
-  pdf.text(`Adiantamento: R$ ${ad.toFixed(2)}`,10,y);y+=6;
-  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);y+=6;
-  const saldo = ad - total;
+  pdf.text("Despesas",10,y);y+=6;
+
+  for(const cat in porCategoria){
+    pdf.text(cat,10,y);y+=5;
+    porCategoria[cat].forEach(d=>{
+      pdf.text(
+        `${d.detalhe||""} | Qtd: ${d.quantidade} | Valor: R$ ${d.valorTotal.toFixed(2)}`,
+        12,y
+      );
+      y+=5;
+    });
+    y+=3;
+  }
+
+  pdf.text(`Adiantamento: R$ ${ad.toFixed(2)}`,10,y);y+=5;
+  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y);y+=5;
+  const saldo=ad-total;
   pdf.text(`Saldo final: R$ ${saldo.toFixed(2)} ${saldo<0?"(NEGATIVO)":"(RESTANTE)"}`,10,y);
 
   if(observacoes.value){
     y+=8;
-    pdf.text("Observações:",10,y);y+=6;
+    pdf.text("Observações:",10,y);y+=5;
     pdf.text(observacoes.value,10,y,{maxWidth:190});
   }
 
   if(anexos.length){
-    pdf.addPage(); y=10;
+    pdf.addPage();y=10;
     anexos.forEach(a=>{
       if(y>220){pdf.addPage();y=10}
       pdf.addImage(a.img,"JPEG",10,y,80,60);
-      if(a.desc){pdf.text(a.desc,10,y+65)}
+      if(a.desc) pdf.text(a.desc,10,y+65);
       y+=75;
     });
   }
