@@ -23,7 +23,6 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
 
 <h1>Despesas Cirurtec</h1>
 
-<!-- DATALIST MG -->
 <datalist id="cidades-mg">
   <option value="Belo Horizonte - MG">
   <option value="Uberlândia - MG">
@@ -32,7 +31,6 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
   <option value="Divinópolis - MG">
   <option value="Sete Lagoas - MG">
   <option value="Montes Claros - MG">
-  <option value="Poços de Caldas - MG">
 </datalist>
 
 <div class="card">
@@ -71,14 +69,14 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
     <option>Outros</option>
   </select>
 
-  <select id="sub" class="hidden" onchange="calcular()">
+  <select id="sub" class="hidden" onchange="calcularValor()">
     <option value="">Refeição</option>
     <option>Almoço</option>
     <option>Café da tarde</option>
     <option>Jantar</option>
   </select>
 
-  <input type="number" id="qtd" class="hidden" min="1" placeholder="Quantidade">
+  <input type="number" id="qtd" class="hidden" min="1" placeholder="Quantidade" oninput="calcularValor()">
   <input id="outros" class="hidden" placeholder="Descrição livre">
   <input id="valor" type="number" placeholder="Valor (R$)" readonly>
 
@@ -90,10 +88,8 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
   <div id="lista"></div>
 </div>
 
-<!-- ANEXOS NO FINAL -->
 <div class="card">
-  <h3>Anexos da viagem</h3>
-
+  <h3>Anexos</h3>
   <button class="btn-sec" onclick="camera.click()">📸 Câmera</button>
   <input id="camera" type="file" accept="image/*" capture="environment" multiple hidden>
 
@@ -109,9 +105,9 @@ button{background:#1976d2;color:#fff;border:none;border-radius:6px}
 let despesas=[], anexos=[];
 
 function addParada(){
-  const div=document.createElement("div");
-  div.innerHTML=`<input list="cidades-mg" placeholder="Cidade de parada">`;
-  document.getElementById("paradas").appendChild(div);
+  const d=document.createElement("div");
+  d.innerHTML=`<input list="cidades-mg" placeholder="Cidade de parada">`;
+  paradas.appendChild(d);
 }
 
 camera.onchange = galeria.onchange = ()=>{
@@ -126,8 +122,8 @@ function controleCategoria(){
   sub.classList.add("hidden");
   qtd.classList.add("hidden");
   outros.classList.add("hidden");
-  valor.readOnly=true;
   valor.value="";
+  valor.readOnly=true;
 
   if(categoria.value==="Alimentação"){
     sub.classList.remove("hidden");
@@ -136,12 +132,12 @@ function controleCategoria(){
 
   if(categoria.value==="Bônus de viagem"){
     qtd.classList.remove("hidden");
-    valor.value=25;
+    calcularValor();
   }
 
   if(categoria.value==="Veículo próprio"){
     qtd.classList.remove("hidden");
-    valor.value=1.28;
+    calcularValor();
   }
 
   if(categoria.value==="Outros"){
@@ -154,14 +150,22 @@ function controleCategoria(){
   }
 }
 
-function calcular(){
-  const tabela={
-    "Almoço":10,
-    "Café da tarde":10,
-    "Jantar":40
-  };
-  if(tabela[sub.value] && qtd.value){
-    valor.value = tabela[sub.value] * qtd.value;
+function calcularValor(){
+  const q = Number(qtd.value)||0;
+
+  if(categoria.value==="Alimentação"){
+    const tabela={"Almoço":10,"Café da tarde":10,"Jantar":40};
+    if(tabela[sub.value] && q){
+      valor.value = tabela[sub.value]*q;
+    }
+  }
+
+  if(categoria.value==="Bônus de viagem" && q){
+    valor.value = 25*q;
+  }
+
+  if(categoria.value==="Veículo próprio" && q){
+    valor.value = (1.28*q).toFixed(2);
   }
 }
 
