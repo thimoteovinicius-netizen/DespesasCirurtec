@@ -14,7 +14,6 @@ body{
   font-family:'Inter',sans-serif;
   background:#f6f8fb;
   padding:15px;
-  color:#2c3e50;
 }
 .header{text-align:center;margin-bottom:20px;}
 .header img{max-width:160px;}
@@ -29,6 +28,7 @@ button{
   background:#1976d2;color:#fff;
 }
 .hidden{display:none;}
+.despesa{background:#f1f1f1;padding:10px;margin-top:8px;border-radius:10px;}
 </style>
 </head>
 
@@ -40,79 +40,162 @@ button{
 </div>
 
 <div class="card">
-  <input id="nome" placeholder="Nome">
+  <input id="nome" placeholder="Nome do técnico">
   <input id="email" placeholder="E-mail">
 </div>
 
 <div class="card">
-  <input type="number" id="valor" placeholder="Valor (R$)">
+  <input id="origem" placeholder="Origem">
+  <input id="destino" placeholder="Destino">
+</div>
+
+<div class="card">
+  <h3>Nova despesa</h3>
+
+  <select id="categoria">
+    <option>Alimentação</option>
+    <option>Combustível</option>
+    <option>Hospedagem</option>
+    <option>Outros</option>
+  </select>
+
+  <input id="descricao" placeholder="Descrição">
+  <input id="valor" type="number" placeholder="Valor">
+
+  <button onclick="addDespesa()">Adicionar</button>
+</div>
+
+<div class="card">
+  <h3>Despesas</h3>
+  <div id="lista"></div>
+</div>
+
+<div class="card">
+  <h3>Anexos</h3>
+  <input type="file" id="file" multiple>
+  <div id="anexos"></div>
+</div>
+
+<div class="card">
+  <textarea id="obs" placeholder="Observações"></textarea>
 </div>
 
 <div class="card">
   <button onclick="gerarPDF()">📄 Gerar PDF</button>
-  <button onclick="enviarEmail()">📧 Enviar por E-mail</button>
-  <button onclick="enviarWhats()">📲 Enviar por WhatsApp</button>
+  <button onclick="revisarPDF()">👁 Revisar PDF</button>
+  <button onclick="enviar()">📤 Enviar relatório</button>
 </div>
 
 <script>
 
+let despesas = [];
+let anexos = [];
 let pdfBlob = null;
 
-async function gerarPDF(){
+// DESPESAS
+function addDespesa(){
+  despesas.push({
+    categoria:categoria.value,
+    descricao:descricao.value,
+    valor:Number(valor.value)
+  });
+  render();
+  descricao.value="";
+  valor.value="";
+}
+
+function render(){
+  lista.innerHTML="";
+  despesas.forEach(d=>{
+    lista.innerHTML += `<div class="despesa">${d.categoria} - R$ ${d.valor}</div>`;
+  });
+}
+
+// ANEXOS
+file.onchange = ()=>{
+  [...file.files].forEach(f=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      anexos.push(e.target.result);
+      anexosRender();
+    }
+    reader.readAsDataURL(f);
+  });
+}
+
+function anexosRender(){
+  anexos.innerHTML="";
+  anexos.forEach(img=>{
+    anexos.innerHTML += `<img src="${img}" width="100%">`;
+  });
+}
+
+// PDF
+function gerarPDF(){
 
   const {jsPDF} = window.jspdf;
   const pdf = new jsPDF();
 
-  pdf.text("Relatório de Despesas",10,10);
-  pdf.text("Nome: "+nome.value,10,20);
-  pdf.text("Email: "+email.value,10,30);
-  pdf.text("Valor: R$ "+valor.value,10,40);
+  let y = 10;
 
-  // gerar blob
+  pdf.text("Relatório de Despesas",10,y); y+=10;
+  pdf.text("Nome: "+nome.value,10,y); y+=10;
+  pdf.text("Email: "+email.value,10,y); y+=10;
+
+  pdf.text("Origem: "+origem.value,10,y); y+=10;
+  pdf.text("Destino: "+destino.value,10,y); y+=10;
+
+  despesas.forEach(d=>{
+    pdf.text(`${d.categoria} - R$ ${d.valor}`,10,y);
+    y+=8;
+  });
+
+  if(obs.value){
+    y+=10;
+    pdf.text("Obs: "+obs.value,10,y);
+  }
+
+  anexos.forEach(img=>{
+    pdf.addPage();
+    pdf.addImage(img,"JPEG",10,10,180,100);
+  });
+
   pdfBlob = pdf.output("blob");
 
-  alert("PDF gerado com sucesso!");
+  alert("PDF gerado!");
 }
 
-// 📧 EMAIL
-async function enviarEmail(){
+// REVISAR
+function revisarPDF(){
+  if(!pdfBlob){
+    alert("Gere o PDF primeiro!");
+    return;
+  }
+
+  const url = URL.createObjectURL(pdfBlob);
+  window.open(url);
+}
+
+// ENVIAR
+async function enviar(){
 
   if(!pdfBlob){
     alert("Gere o PDF primeiro!");
     return;
   }
 
-  const file = new File([pdfBlob], "Despesas.pdf", {type:"application/pdf"});
+  const file = new File([pdfBlob], "Despesas_Cirurtec.pdf", {
+    type:"application/pdf"
+  });
 
   if(navigator.share){
     await navigator.share({
       title:"Relatório de Despesas",
-      text:"Segue relatório em anexo",
+      text:"Segue relatório",
       files:[file]
     });
   }else{
-    alert("Seu dispositivo não suporta envio automático.");
-  }
-}
-
-// 📲 WHATSAPP
-async function enviarWhats(){
-
-  if(!pdfBlob){
-    alert("Gere o PDF primeiro!");
-    return;
-  }
-
-  const file = new File([pdfBlob], "Despesas.pdf", {type:"application/pdf"});
-
-  if(navigator.share){
-    await navigator.share({
-      title:"Relatório",
-      text:"Segue relatório de despesas",
-      files:[file]
-    });
-  }else{
-    alert("Compartilhamento não suportado.");
+    alert("Seu celular não suporta envio automático.");
   }
 }
 
