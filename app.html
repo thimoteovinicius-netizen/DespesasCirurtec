@@ -4,69 +4,66 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Despesas Cirurtec</title>
+<title>Frota Pro</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body{
-  font-family:'Inter',sans-serif;
-  background:#f6f8fb;
-  padding:15px;
-}
-.header{text-align:center;margin-bottom:20px;}
-.header img{max-width:160px;}
-.card{
-  background:#fff;padding:18px;border-radius:18px;margin-bottom:15px;
-}
-input,select,textarea{
-  width:100%;padding:12px;margin-top:8px;border-radius:12px;
-}
-button{
-  width:100%;padding:12px;margin-top:10px;border:none;border-radius:14px;
-  background:#1976d2;color:#fff;
-}
-.hidden{display:none;}
-.despesa{background:#f1f1f1;padding:10px;margin-top:8px;border-radius:10px;}
+body{font-family:Inter;background:#f4f6f9;padding:15px;}
+.card{background:#fff;padding:16px;border-radius:16px;margin-bottom:12px;}
+input,select,textarea{width:100%;padding:10px;margin-top:6px;border-radius:10px;}
+button{width:100%;padding:12px;margin-top:10px;border:none;border-radius:12px;background:#1976d2;color:#fff;}
+.item{background:#eee;padding:8px;margin-top:6px;border-radius:8px;}
+h2{text-align:center;}
 </style>
 </head>
 
 <body>
 
-<div class="header">
-  <img src="1000644584.png">
-  <h2>Despesas Cirurtec</h2>
+<h2>🚗 Frota Pro</h2>
+
+<div class="card">
+  <h3>Veículos</h3>
+  <input id="novoVeiculo" placeholder="Placa / Modelo">
+  <button onclick="addVeiculo()">Adicionar veículo</button>
+  <select id="veiculo"></select>
 </div>
 
 <div class="card">
-  <input id="nome" placeholder="Nome do técnico">
-  <input id="email" placeholder="E-mail">
+  <h3>Motoristas</h3>
+  <input id="novoMotorista" placeholder="Nome">
+  <button onclick="addMotorista()">Adicionar motorista</button>
+  <select id="motorista"></select>
 </div>
 
 <div class="card">
-  <input id="origem" placeholder="Origem">
-  <input id="destino" placeholder="Destino">
+  <h3>KM</h3>
+  <input type="number" id="kmInicial" placeholder="KM Inicial">
+  <input type="number" id="kmFinal" placeholder="KM Final">
+  <p id="kmRodado"></p>
 </div>
 
 <div class="card">
-  <h3>Nova despesa</h3>
+  <h3>Checklist</h3>
+  <label><input type="checkbox" id="pneus"> Pneus</label><br>
+  <label><input type="checkbox" id="oleo"> Óleo</label><br>
+  <label><input type="checkbox" id="freios"> Freios</label><br>
+  <label><input type="checkbox" id="luzes"> Luzes</label><br>
+  <label><input type="checkbox" id="doc"> Documentação</label><br>
+  <textarea id="obsChecklist" placeholder="Observações"></textarea>
+</div>
 
-  <select id="categoria">
-    <option>Alimentação</option>
-    <option>Combustível</option>
-    <option>Hospedagem</option>
-    <option>Outros</option>
+<div class="card">
+  <h3>Registros</h3>
+  <select id="tipo">
+    <option>Abastecimento</option>
+    <option>Manutenção</option>
+    <option>Ocorrência</option>
   </select>
-
-  <input id="descricao" placeholder="Descrição">
-  <input id="valor" type="number" placeholder="Valor">
-
-  <button onclick="addDespesa()">Adicionar</button>
-</div>
-
-<div class="card">
-  <h3>Despesas</h3>
+  <input id="desc" placeholder="Descrição">
+  <input type="number" id="valor" placeholder="Valor">
+  <button onclick="addRegistro()">Adicionar</button>
   <div id="lista"></div>
 </div>
 
@@ -77,83 +74,110 @@ button{
 </div>
 
 <div class="card">
-  <textarea id="obs" placeholder="Observações"></textarea>
-</div>
-
-<div class="card">
-  <button onclick="gerarPDF()">📄 Gerar PDF</button>
-  <button onclick="revisarPDF()">👁 Revisar PDF</button>
-  <button onclick="enviar()">📤 Enviar relatório</button>
+  <button onclick="gerarPDF()">📄 Gerar Relatório</button>
+  <button onclick="revisarPDF()">👁 Revisar</button>
+  <button onclick="enviar()">📤 Enviar</button>
 </div>
 
 <script>
 
-let despesas = [];
+let veiculos = JSON.parse(localStorage.getItem("veiculos")||"[]");
+let motoristas = JSON.parse(localStorage.getItem("motoristas")||"[]");
+let registros = [];
 let anexos = [];
 let pdfBlob = null;
 
-// DESPESAS
-function addDespesa(){
-  despesas.push({
-    categoria:categoria.value,
-    descricao:descricao.value,
-    valor:Number(valor.value)
+// VEICULOS
+function addVeiculo(){
+  veiculos.push(novoVeiculo.value);
+  localStorage.setItem("veiculos",JSON.stringify(veiculos));
+  renderSelects();
+  novoVeiculo.value="";
+}
+
+function addMotorista(){
+  motoristas.push(novoMotorista.value);
+  localStorage.setItem("motoristas",JSON.stringify(motoristas));
+  renderSelects();
+  novoMotorista.value="";
+}
+
+function renderSelects(){
+  veiculo.innerHTML = veiculos.map(v=>`<option>${v}</option>`).join("");
+  motorista.innerHTML = motoristas.map(m=>`<option>${m}</option>`).join("");
+}
+
+renderSelects();
+
+// KM
+kmFinal.oninput = ()=>{
+  kmRodado.innerText = "KM Rodado: " + (kmFinal.value - kmInicial.value);
+}
+
+// REGISTROS
+function addRegistro(){
+  registros.push({
+    tipo:tipo.value,
+    desc:desc.value,
+    valor:Number(valor.value)||0
   });
   render();
-  descricao.value="";
-  valor.value="";
 }
 
 function render(){
   lista.innerHTML="";
-  despesas.forEach(d=>{
-    lista.innerHTML += `<div class="despesa">${d.categoria} - R$ ${d.valor}</div>`;
+  registros.forEach(r=>{
+    lista.innerHTML+=`<div class="item">${r.tipo} - ${r.desc} - R$ ${r.valor}</div>`;
   });
 }
 
 // ANEXOS
-file.onchange = ()=>{
+file.onchange=()=>{
   [...file.files].forEach(f=>{
-    const reader = new FileReader();
-    reader.onload = e=>{
+    const r=new FileReader();
+    r.onload=e=>{
       anexos.push(e.target.result);
       anexosRender();
     }
-    reader.readAsDataURL(f);
+    r.readAsDataURL(f);
   });
 }
 
 function anexosRender(){
   anexos.innerHTML="";
   anexos.forEach(img=>{
-    anexos.innerHTML += `<img src="${img}" width="100%">`;
+    anexos.innerHTML+=`<img src="${img}" width="100%">`;
   });
 }
 
 // PDF
 function gerarPDF(){
 
-  const {jsPDF} = window.jspdf;
-  const pdf = new jsPDF();
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF();
+  let y=10;
 
-  let y = 10;
+  pdf.text("RELATÓRIO DE FROTA",10,y); y+=10;
 
-  pdf.text("Relatório de Despesas",10,y); y+=10;
-  pdf.text("Nome: "+nome.value,10,y); y+=10;
-  pdf.text("Email: "+email.value,10,y); y+=10;
+  pdf.text(`Veículo: ${veiculo.value}`,10,y); y+=8;
+  pdf.text(`Motorista: ${motorista.value}`,10,y); y+=8;
 
-  pdf.text("Origem: "+origem.value,10,y); y+=10;
-  pdf.text("Destino: "+destino.value,10,y); y+=10;
+  pdf.text(`KM Inicial: ${kmInicial.value}`,10,y); y+=8;
+  pdf.text(`KM Final: ${kmFinal.value}`,10,y); y+=8;
+  pdf.text(`KM Rodado: ${kmFinal.value - kmInicial.value}`,10,y); y+=10;
 
-  despesas.forEach(d=>{
-    pdf.text(`${d.categoria} - R$ ${d.valor}`,10,y);
-    y+=8;
+  pdf.text("Checklist",10,y); y+=8;
+
+  pdf.text(`Pneus: ${pneus.checked?"OK":"Problema"}`,10,y); y+=6;
+  pdf.text(`Óleo: ${oleo.checked?"OK":"Problema"}`,10,y); y+=6;
+  pdf.text(`Freios: ${freios.checked?"OK":"Problema"}`,10,y); y+=6;
+  pdf.text(`Luzes: ${luzes.checked?"OK":"Problema"}`,10,y); y+=6;
+  pdf.text(`Documentos: ${doc.checked?"OK":"Problema"}`,10,y); y+=10;
+
+  registros.forEach(r=>{
+    pdf.text(`${r.tipo} - ${r.desc} - R$ ${r.valor}`,10,y);
+    y+=6;
   });
-
-  if(obs.value){
-    y+=10;
-    pdf.text("Obs: "+obs.value,10,y);
-  }
 
   anexos.forEach(img=>{
     pdf.addPage();
@@ -161,41 +185,28 @@ function gerarPDF(){
   });
 
   pdfBlob = pdf.output("blob");
-
-  alert("PDF gerado!");
+  alert("Relatório gerado!");
 }
 
 // REVISAR
 function revisarPDF(){
-  if(!pdfBlob){
-    alert("Gere o PDF primeiro!");
-    return;
-  }
-
-  const url = URL.createObjectURL(pdfBlob);
-  window.open(url);
+  if(!pdfBlob) return alert("Gere primeiro!");
+  window.open(URL.createObjectURL(pdfBlob));
 }
 
 // ENVIAR
 async function enviar(){
+  if(!pdfBlob) return alert("Gere primeiro!");
 
-  if(!pdfBlob){
-    alert("Gere o PDF primeiro!");
-    return;
-  }
-
-  const file = new File([pdfBlob], "Despesas_Cirurtec.pdf", {
-    type:"application/pdf"
-  });
+  const file=new File([pdfBlob],"Relatorio_Frota.pdf",{type:"application/pdf"});
 
   if(navigator.share){
     await navigator.share({
-      title:"Relatório de Despesas",
-      text:"Segue relatório",
-      files:[file]
+      files:[file],
+      title:"Relatório de Frota"
     });
   }else{
-    alert("Seu celular não suporta envio automático.");
+    alert("Não suportado.");
   }
 }
 
