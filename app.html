@@ -1,252 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Calculadora de Vapor de Água</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{
+  font-family: Arial;
+  background:#0f172a;
+  color:#fff;
+  padding:20px;
+}
+
+.container{
+  max-width:500px;
+  margin:auto;
+  background:#1e293b;
+  padding:20px;
+  border-radius:12px;
+}
+
+h1{
+  text-align:center;
+}
+
+label{
+  display:block;
+  margin-top:15px;
+}
+
+input{
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:none;
+  margin-top:5px;
+}
+
+button{
+  margin-top:20px;
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  background:#22c55e;
+  color:#000;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.result{
+  margin-top:20px;
+  padding:15px;
+  background:#020617;
+  border-radius:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h1>Vapor de Água</h1>
+
+<label>Temperatura (°C)</label>
+<input type="number" id="temp" placeholder="Ex: 121" oninput="calcFromTemp()">
+
+<label>Pressão (bar)</label>
+<input type="number" id="press" placeholder="Ex: 2.0" oninput="calcFromPress()">
+
+<div class="result" id="resultado">
+Aguardando entrada...
+</div>
+
+<button onclick="gerarPDF()">Gerar PDF</button>
+</div>
+
 <script>
 
-let despesas=[], anexos=[];
+// Antoine (2 faixas)
+function tempToPressure(T){
+  let A,B,C;
 
-function formatarDataHora(dt){
-  if(!dt) return "";
-  const [data, hora] = dt.split("T");
-  const [y,m,d] = data.split("-");
-  return `${d}/${m}/${y} ${hora}`;
-}
-
-function addParada(){
-  const d=document.createElement("div");
-  d.innerHTML=`<input list="cidades-mg" placeholder="Cidade de parada">`;
-  paradas.appendChild(d);
-}
-
-function controleCategoria(){
-  sub.classList.add("hidden");
-  qtd.classList.add("hidden");
-  outros.classList.add("hidden");
-
-  valor.value="";
-  valor.readOnly=true;
-
-  if(categoria.value==="Alimentação"){
-    sub.classList.remove("hidden");
-    qtd.classList.remove("hidden");
+  if(T <= 99){
+    A=8.07131; B=1730.63; C=233.426;
+  }else{
+    A=8.14019; B=1810.94; C=244.485;
   }
 
-  if(["Bônus de viagem","Veículo próprio"].includes(categoria.value)){
-    qtd.classList.remove("hidden");
-    calcularValor();
-  }
-
-  if(categoria.value==="Outros"){
-    outros.classList.remove("hidden");
-    valor.readOnly=false;
-  }
-
-  if(["Combustível","Pedágios","Peças","Hospedagem"].includes(categoria.value)){
-    valor.readOnly=false;
-  }
+  const P_mmHg = 10**(A - (B/(T + C)));
+  return P_mmHg * 0.00133322;
 }
 
-function calcularValor(){
-  const q=Number(qtd.value)||0;
+// inversão
+function pressureToTemp(P){
+  let Tmin=0, Tmax=200, Tmid;
 
-  if(categoria.value==="Alimentação"){
-    const t={Almoço:10,"Café da tarde":10,Jantar:40};
-    if(t[sub.value]&&q) valor.value=t[sub.value]*q;
-  }
+  for(let i=0;i<40;i++){
+    Tmid=(Tmin+Tmax)/2;
+    const Pcalc=tempToPressure(Tmid);
 
-  if(categoria.value==="Bônus de viagem"&&q) valor.value=25*q;
-
-  if(categoria.value==="Veículo próprio"&&q) valor.value=(1.28*q).toFixed(2);
-}
-
-function addDespesa(){
-  if(!categoria.value||!valor.value) return alert("Preencha os dados");
-
-  despesas.push({
-    categoria:categoria.value,
-    detalhe:sub.value||outros.value||"",
-    quantidade:Number(qtd.value)||1,
-    valorTotal:Number(valor.value)
-  });
-
-  renderDespesas();
-
-  categoria.value=sub.value=qtd.value=outros.value=valor.value="";
-  controleCategoria();
-}
-
-function renderDespesas(){
-  lista.innerHTML="";
-  despesas.forEach((d,i)=>{
-    lista.innerHTML+=`
-      <div class="despesa">
-        ${d.categoria} – R$ ${d.valorTotal.toFixed(2)}
-        <button class="btn-sec" onclick="editarDespesa(${i})">Editar</button>
-        <button class="btn-del" onclick="removerDespesa(${i})">Excluir</button>
-      </div>`;
-  });
-}
-
-function removerDespesa(i){
-  if(confirm("Excluir despesa?")){
-    despesas.splice(i,1);
-    renderDespesas();
-  }
-}
-
-function editarDespesa(i){
-  const d=despesas[i];
-
-  categoria.value=d.categoria;
-  controleCategoria();
-
-  if(categoria.value==="Alimentação"){
-    sub.value=d.detalhe;
-  }else if(categoria.value==="Outros"){
-    outros.value=d.detalhe;
-  }
-
-  qtd.value=d.quantidade;
-  valor.value=d.valorTotal;
-
-  despesas.splice(i,1);
-  renderDespesas();
-}
-
-function processarArquivos(input){
-  [...input.files].forEach(f=>{
-    const r=new FileReader();
-    r.onload=e=>{
-      anexos.push({img:e.target.result,desc:""});
-      renderAnexos();
-    };
-    r.readAsDataURL(f);
-  });
-}
-
-camera.onchange=()=>processarArquivos(camera);
-galeria.onchange=()=>processarArquivos(galeria);
-
-function removerAnexo(i){
-  if(confirm("Excluir anexo?")){
-    anexos.splice(i,1);
-    renderAnexos();
-  }
-}
-
-function renderAnexos(){
-  listaAnexos.innerHTML="";
-  anexos.forEach((a,i)=>{
-    listaAnexos.innerHTML+=`
-      <div class="anexo">
-        <img src="${a.img}" width="100%">
-        <textarea placeholder="Descrição"
-          oninput="anexos[${i}].desc=this.value"></textarea>
-        <button class="btn-del" onclick="removerAnexo(${i})">Excluir</button>
-      </div>`;
-  });
-}
-
-function finalizar(){
-
-  const ad = Number(adiantamento.value)||0;
-
-  const {jsPDF}=window.jspdf;
-  const pdf=new jsPDF();
-
-  let y=10,total=0;
-
-  pdf.setFontSize(12);
-  pdf.text("Cirurtec Hospitalar LTDA",10,y); y+=8;
-
-  pdf.setFontSize(10);
-  pdf.text(`Técnico: ${nome.value}`,10,y); y+=5;
-  pdf.text(`E-mail: ${email.value}`,10,y); y+=5;
-  pdf.text(`Data início: ${formatarDataHora(dataInicio.value)}`,10,y); y+=5;
-  pdf.text(`Data final: ${formatarDataHora(dataFim.value)}`,10,y); y+=8;
-
-  pdf.text("Trajeto",10,y); y+=5;
-  pdf.text(`Origem: ${origem.value}`,10,y); y+=5;
-
-  [...paradas.children].forEach((p,i)=>{
-    const cidade=p.querySelector("input").value;
-    if(cidade){
-      pdf.text(`Parada ${i+1}: ${cidade}`,10,y);
-      y+=5;
+    if(Pcalc > P){
+      Tmax=Tmid;
+    }else{
+      Tmin=Tmid;
     }
-  });
-
-  pdf.text(`Destino: ${destino.value}`,10,y); y+=8;
-
-  const porCategoria={};
-
-  despesas.forEach(d=>{
-    if(!porCategoria[d.categoria]) porCategoria[d.categoria]=[];
-    porCategoria[d.categoria].push(d);
-    total+=d.valorTotal;
-  });
-
-  pdf.text("Despesas",10,y); y+=6;
-
-  for(const cat in porCategoria){
-    pdf.setFont(undefined,"bold");
-    pdf.text(cat,10,y); y+=5;
-
-    pdf.setFont(undefined,"normal");
-
-    porCategoria[cat].forEach(d=>{
-      pdf.text(`${d.detalhe||"-"} | Qtd: ${d.quantidade} | R$ ${d.valorTotal.toFixed(2)}`,12,y);
-      y+=5;
-
-      if(y>270){
-        pdf.addPage();
-        y=10;
-      }
-    });
-
-    y+=3;
   }
 
-  pdf.text(`Adiantamento: R$ ${ad.toFixed(2)}`,10,y); y+=5;
-  pdf.text(`Total gasto: R$ ${total.toFixed(2)}`,10,y); y+=5;
+  return Tmid;
+}
 
-  const saldo=ad-total;
-  pdf.text(`Saldo final: R$ ${saldo.toFixed(2)} ${saldo<0?"(NEGATIVO)":"(RESTANTE)"}`,10,y);
+// cálculo via temperatura
+function calcFromTemp(){
+  const T = Number(document.getElementById("temp").value);
+  if(isNaN(T)) return;
 
-  if(observacoes.value){
-    y+=8;
-    pdf.text("Observações:",10,y); y+=5;
-    pdf.text(observacoes.value,10,y,{maxWidth:190});
-  }
+  const P = tempToPressure(T);
 
-  /* 🔥 CORREÇÃO DOS ANEXOS AQUI */
-  if(anexos.length){
-    pdf.addPage();
+  document.getElementById("press").value = P.toFixed(3);
 
-    anexos.forEach(a=>{
-      const img = new Image();
-      img.src = a.img;
+  mostrarResultado(T,P);
+}
 
-      const larguraMax = 180;
-      const proporcao = img.width / img.height;
+// cálculo via pressão
+function calcFromPress(){
+  const P = Number(document.getElementById("press").value);
+  if(isNaN(P)) return;
 
-      const largura = larguraMax;
-      const altura = largura / proporcao;
+  const T = pressureToTemp(P);
 
-      if(y + altura > 280){
-        pdf.addPage();
-        y = 10;
-      }
+  document.getElementById("temp").value = T.toFixed(1);
 
-      pdf.addImage(a.img,"JPEG",15,y,largura,altura);
+  mostrarResultado(T,P);
+}
 
-      if(a.desc){
-        pdf.text(a.desc,15,y+altura+5);
-        y += altura + 15;
-      }else{
-        y += altura + 10;
-      }
-    });
-  }
+// exibir resultado
+function mostrarResultado(T,P){
+  document.getElementById("resultado").innerHTML = `
+    <b>Resultado:</b><br>
+    Temperatura: ${T.toFixed(2)} °C<br>
+    Pressão: ${P.toFixed(3)} bar<br><br>
+    <small>Base: vapor saturado</small>
+  `;
+}
 
-  pdf.save("Despesas_Cirurtec.pdf");
+// PDF
+function gerarPDF(){
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF();
+
+  const T = document.getElementById("temp").value;
+  const P = document.getElementById("press").value;
+
+  pdf.text("Relatório Termodinâmico", 10, 10);
+  pdf.text(`Temperatura: ${T} °C`, 10, 20);
+  pdf.text(`Pressão: ${P} bar`, 10, 30);
+  pdf.text("Base: Vapor saturado de água", 10, 40);
+
+  pdf.save("calculo_vapor.pdf");
 }
 
 </script>
+
+</body>
+</html>
